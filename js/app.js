@@ -1269,12 +1269,14 @@ function run() {
 }
 
 function enableOutputs() {
-    ["exportPreview", "exportFull", "exportSvg", "exportPdf", "exportPack", "exportBoards", "exportPixel", "editToggle"].forEach(
+    ["exportPreview", "exportFull", "exportSvg", "exportPdf", "exportPack", "exportBoards", "exportPixel", "editToggle", "saveDrawingBtn"].forEach(
     (id) => {
       const el = $("#" + id);
       if (el) el.disabled = false;
     }
   );
+    const details = document.querySelector(".details");
+    if (details) details.classList.add("open");
 }
 
 function syncControlsFromState() {
@@ -1373,6 +1375,209 @@ function restoreProject() {
   redraw();
   setHint("已自动恢复上次的工程");
   return true;
+}
+
+// ---------------- 图纸库（服务端文件仓库） ----------------
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+async function apiJSON(url, opts) {
+  const r = await fetch(url, opts);
+  return await r.json();
+}
+function currentDrawingPayload(extra) {
+  const res = state.result;
+  const cleanGrid = res
+    ? res.grid.map((row) => row.map((c) => {
+        const { n, ...rest } = c;
+        return rest;
+      }))
+    : null;
+  return Object.assign(
+    {
+      v: 1,
+      p: {
+        paletteKey: state.paletteKey,
+        paletteSize: state.paletteSize,
+        cols: state.cols,
+        colorMode: state.colorMode,
+        maxColors: state.maxColors,
+        boardOrientation: state.boardOrientation,
+        removeBg: state.removeBg,
+        bgTol: state.bgTol,
+        edgeAware: state.edgeAware,
+        outlineMode: state.outlineMode,
+        pixelWhiteBg: state.pixelWhiteBg,
+        mode: state.mode,
+        showGhost: state.showGhost,
+      },
+      grid: cleanGrid,
+      gcols: res ? res.cols : null,
+      grows: res ? res.rows : null,
+      w: res ? (res.cols * 0.5).toFixed(1) : 0,
+      h: res ? (res.rows * 0.5).toFixed(1) : 0,
+    },
+    extra || {}
+  );
+}
+function makeThumb() {
+  const src = document.getElementById("preview");
+  if (!src || !src.width) return "";
+  const max = 240;
+  const scale = Math.min(1, max / Math.max(src.width, src.height));
+  const w = Math.max(1, Math.round(src.width * scale));
+  const h = Math.max(1, Math.round(src.height * scale));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  c.getContext("2d").drawImage(src, 0, 0, w, h);
+  try {
+    return c.toDataURL("image/png");
+  } catch (e) {
+    return "";
+  }
+}
+function applyDrawingData(data) {
+  if (!data || !data.grid) return false;
+  Object.assign(state, data.p);
+  state.editing = false;
+  const palette = getActivePalette(state.paletteKey, state.paletteSize);
+  const counts = new Array(palette.length).fill(0);
+  for (const row of data.grid)
+    for (const c of row)
+      if (c.ci != null && c.ci < counts.length && !c.blank && !c.bg) counts[c.ci]++;
+  state.result = {
+    grid: data.grid,
+    cols: data.gcols,
+    rows: data.grows,
+    paletteKey: state.paletteKey,
+    size: state.paletteSize,
+    palette,
+    counts,
+  };
+  edgeCache = null;
+  syncControlsFromState();
+  enableOutputs();
+  redraw();
+  return true;
+}
+async function saveDrawing() {
+  if (!state.result) {
+    alert("请先生成一张图纸，再保存到图纸库");
+    return;
+  }
+  const nameEl = $("#libName");
+  const tagsEl = $("#libTags");
+  const name = (nameEl && nameEl.value ? nameEl.value : "").trim() || "图纸 " + new Date().toLocaleString();
+  const tags = tagsEl && tagsEl.value
+    ? tagsEl.value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean)
+    : [];
+  const payload = currentDrawingPayload({ name, tags, thumb: makeThumb(), createdAt: Date.now() });
+  try {
+    const r = await apiJSON("/api/library", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (r.ok) {
+      setHint("已存入图纸库：" + name);
+      if (nameEl) nameEl.value = "";
+      if (tagsEl) tagsEl.value = "";
+      loadLibraryList();
+    } else {
+      alert("保存失败：" + (r.error || ""));
+    }
+  } catch (e) {
+    alert("保存失败：" + e.message);
+  }
+}
+async function loadDrawing(id) {
+  try {
+    const r = await apiJSON("/api/library/" + encodeURIComponent(id));
+    if (r && r.grid) {
+      applyDrawingData(r);
+      closeLibrary();
+      setHint("已载入图纸：" + (r.name || id));
+    } else {
+      alert("载入失败：图纸数据缺失");
+    }
+  } catch (e) {
+    alert("载入失败：" + e.message);
+  }
+}
+async function deleteDrawing(id, name) {
+  if (!confirm("确定删除图纸「" + name + "」？此操作不可撤销。")) return;
+  try {
+    const r = await apiJSON("/api/library/" + encodeURIComponent(id), { method: "DELETE" });
+    if (r.ok) loadLibraryList();
+    else alert("删除失败：" + (r.error || ""));
+  } catch (e) {
+    alert("删除失败：" + e.message);
+  }
+}
+async function renameDrawing(id, name) {
+  const nn = prompt("重命名图纸：", name);
+  if (nn == null) return;
+  try {
+    const r = await apiJSON("/api/library/" + encodeURIComponent(id), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nn.trim() || name }),
+    });
+    if (r.ok) loadLibraryList();
+    else alert("重命名失败：" + (r.error || ""));
+  } catch (e) {
+    alert("重命名失败：" + e.message);
+  }
+}
+async function loadLibraryList() {
+  const grid = $("#libraryGrid");
+  if (!grid) return;
+  grid.innerHTML = '<p class="muted">加载中…</p>';
+  let list = [];
+  try {
+    const data = await apiJSON("/api/library");
+    list = Array.isArray(data) ? data : [];
+  } catch (e) {
+    grid.innerHTML = '<p class="muted">读取图纸库失败：' + escapeHtml(e.message) + "</p>";
+    return;
+  }
+  if (!list.length) {
+    grid.innerHTML = '<p class="muted">图纸库还是空的。先生成一张图纸，填好名称，点「保存到图纸库」。</p>';
+    return;
+  }
+  grid.innerHTML = list
+    .map(
+      (m) => `
+    <div class="lib-card panel">
+      <div class="lib-thumb">${m.thumb ? `<img src="${m.thumb}" alt="">` : '<span class="muted small">无预览</span>'}</div>
+      <div class="lib-meta">
+        <div class="lib-name">${escapeHtml(m.name)}</div>
+        <div class="lib-sub muted small">${m.cols}×${m.rows} 格 · ${m.w}×${m.h} cm${
+        m.tags && m.tags.length ? " · " + m.tags.map(escapeHtml).join(" / ") : ""
+      }</div>
+        <div class="lib-actions">
+          <button class="mini-btn" data-load="${m.id}">载入</button>
+          <button class="mini-btn" data-rename="${m.id}" data-name="${escapeHtml(m.name)}">重命名</button>
+          <button class="mini-btn" data-del="${m.id}" data-name="${escapeHtml(m.name)}">删除</button>
+        </div>
+      </div>
+    </div>`
+    )
+    .join("");
+}
+function openLibrary() {
+  loadLibraryList();
+  const m = $("#libraryModal");
+  if (m) m.classList.add("show");
+}
+function closeLibrary() {
+  const m = $("#libraryModal");
+  if (m) m.classList.remove("show");
 }
 
 function clearProject() {
@@ -1860,7 +2065,44 @@ const ICONS = {
   file: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/>',
 };
 
+const PIX = {
+  image: ["........", ".######.", ".#....#.", ".#.##.#.", ".#.##.#.", ".#....#.", ".######.", "........"],
+  sparkles: ["...#....", "...#....", ".##.##..", "#######.", ".##.##..", "...#....", "...#....", "........"],
+  palette: ["..####..", ".#....#.", "#.#..#.#", "#.#..#.#", "#.#..#.#", ".#....#.", "..####..", "........"],
+  pen: [".....##.", "....##..", "...##...", "..##....", ".##.....", "##......", ".##.....", "........"],
+  file: [".#####..", ".#...#.#", ".#...#.#", ".#.#.#..", ".#.#.#..", ".#...#.#", ".#####..", "........"],
+  layers: ["...##...", "..####..", ".######.", "..####..", ".######.", "..####..", ".######.", "........"],
+  download: ["...##...", "...##...", "...##...", "...##...", ".######.", "..####..", "...##...", "........"],
+  code: [".#....#.", ".##..##.", "#.#..#.#", "#.#..#.#", "#.#..#.#", ".##..##.", ".#....#.", "........"],
+  pdf: [".#####..", ".#...#..", ".#.#.#..", ".#.#.#..", ".#.#.#..", ".#...#..", ".#####..", "........"],
+  package: ["..####..", ".######.", "########", "#.####.#", "########", ".######.", "..####..", "........"],
+  grid: [".#.#.#.#", "########", ".#.#.#.#", "########", ".#.#.#.#", "########", ".#.#.#.#", "........"],
+  magic: [".#......", ".##.....", ".###....", "#######.", ".###....", ".##.....", ".#......", "........"],
+  undo: ["##......", ".##.....", "..##....", "....##..", "..##....", ".##.....", "##......", "........"],
+  redo: ["......##", ".....##.", "....##..", "..##....", "....##..", ".....##.", "......##", "........"],
+  board: [".######.", ".#....#.", ".#.##.#.", ".#.##.#.", ".#.##.#.", ".#....#.", ".######.", "........"],
+};
+
+function pxIcon(name, cls) {
+  const rows = PIX[name];
+  if (!rows) return null;
+  const h = rows.length;
+  const w = rows[0].length;
+  let rects = "";
+  for (let y = 0; y < h; y++) {
+    const row = rows[y];
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === "#" || row[x] === "1") {
+        rects += `<rect x="${x}" y="${y}" width="1" height="1"/>`;
+      }
+    }
+  }
+  return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 ${w} ${h}" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+}
+
 function svgIcon(name, cls) {
+  const p = pxIcon(name, cls);
+  if (p) return p;
   const inner = ICONS[name] || "";
   return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }
@@ -1879,8 +2121,9 @@ function applyTheme(name) {
   try {
     localStorage.setItem("pindou-theme", name);
   } catch (e) {}
-  const sel = $("#themeSelect");
-  if (sel) sel.value = name;
+  document.querySelectorAll(".theme-pick .seg").forEach((b) => {
+    b.classList.toggle("active", b.dataset.theme === name);
+  });
 }
 
 function init() {
@@ -1891,7 +2134,7 @@ function init() {
       return null;
     }
   })();
-  applyTheme(saved || "cute");
+  applyTheme(saved || "pixel");
 
   const pal = $("#palette");
   for (const key of Object.keys(BEAD_PALETTES)) {
@@ -1971,6 +2214,36 @@ function init() {
     pixelWhiteBgEl.addEventListener("change", (e) => {
       state.pixelWhiteBg = e.target.checked;
       saveProject();
+    });
+  }
+
+  const controlsToggle = document.querySelector(".controls-toggle");
+  if (controlsToggle) {
+    controlsToggle.addEventListener("click", () => {
+      document.querySelector(".controls")?.classList.toggle("collapsed");
+    });
+  }
+  const detailsToggle = document.querySelector(".details-toggle");
+  if (detailsToggle) {
+    detailsToggle.addEventListener("click", () => {
+      document.querySelector(".details")?.classList.toggle("open");
+    });
+  }
+
+  const sideEl = document.querySelector(".side");
+  const exportMenuBtn = document.getElementById("exportMenuBtn");
+  if (exportMenuBtn && sideEl) {
+    exportMenuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      sideEl.classList.toggle("export-open");
+    });
+    sideEl.querySelectorAll(".actions button").forEach((b) => {
+      b.addEventListener("click", () => sideEl.classList.remove("export-open"));
+    });
+    document.addEventListener("click", (e) => {
+      if (!sideEl.classList.contains("export-open")) return;
+      if (sideEl.contains(e.target) && e.target !== exportMenuBtn) return;
+      sideEl.classList.remove("export-open");
     });
   }
 
@@ -2137,6 +2410,43 @@ function init() {
     $("#paywall").classList.remove("show");
   });
 
+  // 图纸库
+  const openLibBtn = $("#openLibrary");
+  if (openLibBtn) openLibBtn.addEventListener("click", openLibrary);
+  const saveDrawBtn = $("#saveDrawingBtn");
+  if (saveDrawBtn)
+    saveDrawBtn.addEventListener("click", () => {
+      if (!state.result) {
+        alert("请先生成一张图纸，再保存到图纸库");
+        return;
+      }
+      openLibrary();
+      setTimeout(() => {
+        const n = $("#libName");
+        if (n) n.focus();
+      }, 60);
+    });
+  const libSave = $("#libSave");
+  if (libSave) libSave.addEventListener("click", saveDrawing);
+  const libClose = $("#libraryClose");
+  if (libClose) libClose.addEventListener("click", closeLibrary);
+  const libModal = $("#libraryModal");
+  if (libModal) {
+    libModal.addEventListener("click", (e) => {
+      if (e.target === libModal) closeLibrary();
+    });
+  }
+  const libGrid = $("#libraryGrid");
+  if (libGrid) {
+    libGrid.addEventListener("click", (e) => {
+      const t = e.target.closest("button");
+      if (!t) return;
+      if (t.dataset.load) loadDrawing(t.dataset.load);
+      else if (t.dataset.del) deleteDrawing(t.dataset.del, t.dataset.name || "");
+      else if (t.dataset.rename) renameDrawing(t.dataset.rename, t.dataset.name || "");
+    });
+  }
+
   document.querySelectorAll(".tabbtn").forEach((b) =>
     b.addEventListener("click", () => switchTab(b.dataset.tab))
   );
@@ -2153,9 +2463,9 @@ function init() {
   );
   initEditListeners();
   applyIcons();
-  const themeSel = $("#themeSelect");
-  if (themeSel)
-    themeSel.addEventListener("change", (e) => applyTheme(e.target.value));
+  document.querySelectorAll(".theme-pick .seg").forEach((b) => {
+    b.addEventListener("click", () => applyTheme(b.dataset.theme));
+  });
 
   window.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;

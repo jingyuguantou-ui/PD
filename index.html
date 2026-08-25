@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#8b5cf6" />
+  <meta name="theme-color" content="#2b6cff" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <title>拼豆图稿生成器</title>
@@ -12,18 +12,25 @@
 <body>
   <header>
     <div class="brand">
-      <h1>拼豆图稿生成器</h1>
-      <p class="sub">图片转图稿 · AI 生图 · 色卡校验</p>
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 20 16" width="36" height="36" fill="currentColor">
+          <path d="M3 8 L0 4 L0 12 Z" />
+          <path d="M3 8 Q3 4 8 4 H13 Q17 4 17 8 Q17 12 12 12 H6 Q3 12 3 8 Z" />
+          <path d="M11 4 q0 -3 1.1 -3" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" />
+          <circle cx="14.4" cy="7.4" r="1.1" fill="#fff" />
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1>鲸鱼罐头 · 拼豆图稿</h1>
+        <p class="sub">图片转图稿 · AI 生图 · 色卡校验</p>
+      </div>
     </div>
     <div class="header-tools">
-      <label class="theme-pick" title="切换主题风格">
-        <span class="ic" data-icon="theme"></span>
-        <select id="themeSelect">
-          <option value="cute">可爱卡通</option>
-          <option value="modern">简洁现代</option>
-          <option value="pixel">像素复古</option>
-        </select>
-      </label>
+      <button type="button" id="openLibrary" class="header-btn" data-icon="board">我的图纸</button>
+      <div class="theme-pick" role="group" aria-label="主题风格">
+        <button type="button" class="seg" data-theme="cute">奇思妙想嘉</button>
+        <button type="button" class="seg active" data-theme="pixel">鲸鱼罐头</button>
+      </div>
     </div>
   </header>
 
@@ -35,7 +42,11 @@
 
   <main>
     <section class="tabpanel" data-tab="convert">
-      <div class="controls">
+      <div class="controls panel">
+        <div class="controls-head">
+          <button class="controls-toggle" type="button">图片与配色设置 <span class="chev">▾</span></button>
+        </div>
+        <div class="controls-body">
         <label class="field">
           图片
           <input type="file" id="file" accept="image/*" />
@@ -117,8 +128,9 @@
         <button id="editToggle" type="button" data-icon="pen" disabled>编辑</button>
         <button id="runBtn" data-icon="image" disabled>生成图稿</button>
         <button id="newBtn" type="button" data-icon="file">新建</button>
-        <span id="hint" class="hint">请先上传图片</span>
-      </div>
+          <span id="hint" class="hint">请先上传图片</span>
+        </div><!-- /controls-body -->
+        </div><!-- /controls -->
 
       <div class="output">
         <div class="viewbar">
@@ -130,29 +142,37 @@
           <button id="zoom100" type="button">实际大小</button>
           <span class="vtip">可拖拽/触摸平移 · 滚轮/双指缩放</span>
         </div>
-        <div class="canvas-wrap">
+        <div class="canvas-wrap panel">
           <canvas id="preview"></canvas>
           <div id="hoverBox" class="hover-box" hidden></div>
           <div id="cellTip" class="cell-tip" hidden></div>
         </div>
         <aside class="side">
           <div class="actions">
+            <button id="saveDrawingBtn" class="save-cta" data-icon="download" disabled>保存图纸</button>
             <button id="exportPreview" data-icon="image" disabled>导出预览图 PNG（免费·带水印）</button>
             <button id="exportPixel" data-icon="layers" disabled>导出逐格像素图 PNG（免费·用于豆画 / 颂拼豆）</button>
             <button id="exportFull" data-icon="download" disabled>导出完整高清图 PNG（Pro）</button>
             <button id="exportSvg" data-icon="code" disabled>导出矢量 SVG（Pro）</button>
             <button id="exportPdf" data-icon="pdf" disabled>导出分块打印 PDF（Pro·A4 分页）</button>
             <button id="exportPack" data-icon="package" disabled>导出材料包清单（免费）</button>
-            <button id="exportBoards" data-icon="grid" disabled>导出分板裁切图（每板一页 PDF·Pro）</button>
-          </div>
+              <button id="exportBoards" data-icon="grid" disabled>导出分板裁切图（每板一页 PDF·Pro）</button>
+            </div>
+            <button id="exportMenuBtn" class="export-fab" type="button">导出 <span class="chev">▾</span></button>
 
-          <div id="infoPanel" class="info-panel"></div>
+            <div class="details">
+            <button class="details-toggle" type="button">图例 / 用料 / 设置 <span class="chev">▾</span></button>
+            <div class="details-body">
+              <div id="infoPanel" class="info-panel panel"></div>
           <label class="field check">
             <input type="checkbox" id="pixelWhiteBg" /> 逐格像素图：背景填白（默认透明，部分 App 把透明当地时用填白更稳）
           </label>
           <div class="actions-hint muted small">免费：预览图（带水印）+ 逐格像素图（用于豆画 / 颂拼豆）+ 材料包清单 · Pro：去水印高清 / 矢量 / 分块打印 PDF / 分板裁切图 · PDF 需联网加载库</div>
+              <div id="legend" class="legend panel"></div>
+            </div><!-- /details-body -->
+          </div><!-- /details -->
 
-          <div class="edit-panel" id="editPanel" hidden>
+          <div class="edit-panel panel" id="editPanel" hidden>
             <div class="edit-head">手动编辑 <span class="muted">（专业拼豆绘图）</span></div>
             <div class="edit-toolbar">
               <button type="button" class="tool-btn active" data-tool="paint" data-icon="brush" title="画笔 (B)">画笔</button>
@@ -213,8 +233,6 @@
             <div id="boardInfo" class="muted small"></div>
             <p class="muted small">画笔/擦除可拖拽连续 · 用「擦除」工具或右键擦除 · 直线/矩形/椭圆拖拽成形 · 选择后可拖动/复制/删除 · 取色后自动切画笔 · 点图例批量改色 · Delete 删选区 · Esc 取消。</p>
           </div>
-
-          <div id="legend" class="legend"></div>
         </aside>
       </div>
     </section>
@@ -384,6 +402,22 @@
     <div class="tp-actions">
       <button id="textCancel" type="button">取消</button>
       <button id="textOk" type="button" class="primary">填入</button>
+    </div>
+  </div>
+
+  <div id="libraryModal" class="modal">
+    <div class="modal-box lib-modal">
+      <div class="lib-head">
+        <h3>我的图纸库</h3>
+        <button id="libraryClose" type="button" class="lib-x" aria-label="关闭">✕</button>
+      </div>
+      <div class="lib-save">
+        <input id="libName" class="field" placeholder="图纸名称（如：橘猫头像·58格）" />
+        <input id="libTags" class="field" placeholder="标签，用空格或逗号分隔（如：动物 礼物）" />
+        <button id="libSave" class="primary" data-icon="download">保存到图纸库</button>
+      </div>
+      <div id="libraryGrid" class="lib-grid"></div>
+      <p class="muted small">图纸保存在本机服务器 <code>library/</code> 文件夹（每份一个 json + 缩略图），可直接备份或分享；云端同步之后再说。</p>
     </div>
   </div>
   <script>

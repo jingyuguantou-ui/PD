@@ -36,6 +36,7 @@ function sendFile(res, filePath) {
     }
     res.writeHead(200, {
       "Content-Type": MIME[path.extname(filePath)] || "application/octet-stream",
+      "Cache-Control": "no-cache",
     });
     res.end(data);
   });
@@ -306,6 +307,141 @@ const requestHandler = async (req, res) => {
     });
     return;
   }
+  // ---------- 图纸库（本地文件仓库） ----------
+  const LIBRARY_DIR = path.join(ROOT, "library");
+  function ensureLibrary() {
+    if (!fs.existsSync(LIBRARY_DIR)) fs.mkdirSync(LIBRARY_DIR, { recursive: true });
+    const idx = path.join(LIBRARY_DIR, "index.json");
+    if (!fs.existsSync(idx)) fs.writeFileSync(idx, "[]");
+  }
+  function readIndex() {
+    ensureLibrary();
+    try {
+      return JSON.parse(fs.readFileSync(path.join(LIBRARY_DIR, "index.json"), "utf8"));
+    } catch (e) {
+      return [];
+    }
+  }
+  function writeIndex(arr) {
+    fs.writeFileSync(path.join(LIBRARY_DIR, "index.json"), JSON.stringify(arr, null, 2));
+  }
+  function libId() {
+    return "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function safeId(id) {
+    return typeof id === "string" && /^[A-Za-z0-9_-]{1,48}$/.test(id);
+  }
+  function readLibFile(id) {
+    const f = path.join(LIBRARY_DIR, id + ".json");
+    if (!fs.existsSync(f)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(f, "utf8"));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  if (req.method === "GET" && req.url === "/api/library") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(readIndex()));
+    return;
+  }
+  if (req.method === "POST" && req.url === "/api/library") {
+    ensureLibrary();
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      try {
+        const data = JSON.parse(body || "{}");
+        if (!data.grid) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "empty grid" }));
+          return;
+        }
+        const id = libId();
+        const meta = {
+          id,
+          name: String(data.name || "未命名图纸").slice(0, 80),
+          tags: Array.isArray(data.tags) ? data.tags.slice(0, 12).map(String) : [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          cols: data.cols || 0,
+          rows: data.rows || 0,
+          w: data.w || 0,
+          h: data.h || 0,
+          thumb: typeof data.thumb === "string" ? data.thumb : "",
+        };
+        fs.writeFileSync(path.join(LIBRARY_DIR, id + ".json"), JSON.stringify({ ...data, id, name: meta.name, tags: meta.tags, createdAt: meta.createdAt, updatedAt: meta.updatedAt }));
+        const arr = readIndex();
+        arr.unshift(meta);
+        writeIndex(arr);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, id }));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+  const libMatch = req.url.match(/^\/api\/library\/([A-Za-z0-9_-]+)$/);
+  if (libMatch) {
+    const id = libMatch[1];
+    if (!safeId(id)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "bad id" }));
+      return;
+    }
+    if (req.method === "GET") {
+      const data = readLibFile(id);
+      if (!data) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "not found" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(data));
+      return;
+    }
+    if (req.method === "DELETE") {
+      const f = path.join(LIBRARY_DIR, id + ".json");
+      if (fs.existsSync(f)) fs.unlinkSync(f);
+      writeIndex(readIndex().filter((m) => m.id !== id));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    if (req.method === "PUT") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        try {
+          const cur = readLibFile(id);
+          if (!cur) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: "not found" }));
+            return;
+          }
+          const patch = JSON.parse(body || "{}");
+          if (patch.name != null) cur.name = String(patch.name).slice(0, 80);
+          if (Array.isArray(patch.tags)) cur.tags = patch.tags.slice(0, 12).map(String);
+          cur.updatedAt = Date.now();
+          fs.writeFileSync(path.join(LIBRARY_DIR, id + ".json"), JSON.stringify(cur));
+          const arr = readIndex().map((m) =>
+            m.id === id ? { ...m, name: cur.name, tags: cur.tags, updatedAt: cur.updatedAt } : m
+          );
+          writeIndex(arr);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: e.message }));
+        }
+      });
+      return;
+    }
+  }
+
   let urlPath = req.url.split("?")[0];
   if (urlPath === "/") urlPath = "/index.html";
   const filePath = path.join(ROOT, path.normalize(urlPath));
