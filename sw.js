@@ -1,4 +1,4 @@
-const CACHE = "pindou-v2";
+const CACHE = "pindou-v3";
 const ASSETS = [
   ".",
   "index.html",

@@ -756,11 +756,15 @@ canvas {
 .modal {
   display: none;
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: 70;
 }
 
 .modal.show {
@@ -1093,14 +1097,14 @@ canvas {
     min-height: 56vh;
   }
   .side {
-    padding-bottom: 92px;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
   }
   .export-fab {
     display: flex;
     position: fixed;
-    left: 14px;
-    right: 14px;
-    bottom: 14px;
+    left: calc(14px + env(safe-area-inset-left, 0px));
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     z-index: 60;
     height: 52px;
     align-items: center;
@@ -1119,7 +1123,7 @@ canvas {
     position: fixed;
     left: 14px;
     right: 14px;
-    bottom: 78px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
     z-index: 59;
     display: none;
     flex-direction: column;
@@ -1142,6 +1146,7 @@ canvas {
     min-width: 0;
     white-space: normal;
     text-align: left;
+    cursor: pointer;
   }
   .legend-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -1310,3 +1315,13 @@ canvas {
   box-shadow: var(--shadow);
   margin-bottom: 2px;
 }
+
+.pro-cta {
+  font-weight: 800;
+  border: 3px solid var(--accent);
+  color: #fff;
+  background: var(--accent);
+  box-shadow: var(--shadow);
+  margin-top: 6px;
+}
+.pro-cta:hover { filter: brightness(1.06); }

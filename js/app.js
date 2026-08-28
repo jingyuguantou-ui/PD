@@ -981,7 +981,7 @@ function getEdgeCanvas() {
 }
 
 function exportBoards() {
-  if (!state.result) return;
+  if (!state.result) { setHint("请先生成图纸，再导出"); return; }
   if (!state.pro) {
     openPaywall("分板裁切图（每板一页）为 Pro 功能");
     return;
@@ -1791,7 +1791,7 @@ function exportPreview() {
 }
 
 function exportFull() {
-  if (!state.result) return;
+  if (!state.result) { setHint("请先生成图纸，再导出"); return; }
   if (!state.pro) {
     openPaywall("完整高清图（无水印）为 Pro 功能");
     return;
@@ -1863,7 +1863,7 @@ function buildSvg(result) {
 }
 
 function exportSvg() {
-  if (!state.result) return;
+  if (!state.result) { setHint("请先生成图纸，再导出"); return; }
   if (!state.pro) {
     openPaywall("矢量 SVG（无水印）为 Pro 功能");
     return;
@@ -1907,7 +1907,7 @@ function renderLegendPage(pdf, result) {
 }
 
 function exportPdf() {
-  if (!state.result) return;
+  if (!state.result) { setHint("请先生成图纸，再导出"); return; }
   if (!state.pro) {
     openPaywall("分块打印 PDF（A4 分页）为 Pro 功能");
     return;
@@ -2003,8 +2003,14 @@ function exportPack() {
 }
 
 function openPaywall(reason) {
-  $("#paywallReason").textContent = reason || "";
-  $("#paywall").classList.add("show");
+  const el = $("#paywall");
+  const r = $("#paywallReason");
+  if (r) r.textContent = reason || "";
+  if (el) {
+    el.classList.add("show");
+    el.style.display = "flex";
+    el.style.zIndex = "2147483647";
+  }
 }
 
 function applyView() {
@@ -2300,6 +2306,7 @@ function init() {
   $("#exportSvg").addEventListener("click", exportSvg);
   $("#exportPdf").addEventListener("click", exportPdf);
   $("#exportPack").addEventListener("click", exportPack);
+  $("#upgradePro").addEventListener("click", () => openPaywall("升级 Pro 解锁：去水印完整图、矢量 SVG、A4 分块打印 PDF、分板裁切图"));
 
   $("#zoomFit").addEventListener("click", () => setZoom("fit"));
   $("#zoomIn").addEventListener("click", () => {
@@ -2403,11 +2410,20 @@ function init() {
 
   $("#unlockPro").addEventListener("click", () => {
     state.pro = true;
-    $("#paywall").classList.remove("show");
+    const pw = $("#paywall");
+    if (pw) { pw.classList.remove("show"); pw.style.display = ""; pw.style.zIndex = ""; }
     if (state.result) run();
   });
   $("#paywallClose").addEventListener("click", () => {
-    $("#paywall").classList.remove("show");
+    const pw = $("#paywall");
+    if (pw) { pw.classList.remove("show"); pw.style.display = ""; pw.style.zIndex = ""; }
+  });
+  $("#paywall").addEventListener("click", (e) => {
+    if (e.target === $("#paywall")) {
+      $("#paywall").classList.remove("show");
+      $("#paywall").style.display = "";
+      $("#paywall").style.zIndex = "";
+    }
   });
 
   // 图纸库
