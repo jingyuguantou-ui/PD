@@ -1477,77 +1477,81 @@ async function saveDrawing() {
     ? tagsEl.value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean)
     : [];
   const payload = currentDrawingPayload({ name, tags, thumb: makeThumb(), createdAt: Date.now() });
+  let savedOk = false;
+  let savedId = null;
   try {
     const r = await apiJSON("/api/library", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (r.ok) {
-      setHint("已存入图纸库：" + name);
-      if (nameEl) nameEl.value = "";
-      if (tagsEl) tagsEl.value = "";
-      loadLibraryList();
-    } else {
-      alert("保存失败：" + (r.error || ""));
-    }
-  } catch (e) {
-    alert("保存失败：" + e.message);
-  }
+    if (r.ok) { savedOk = true; savedId = r.id; }
+  } catch (e) {}
+  if (savedId) payload.id = savedId;
+  else payload.id = "local-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  try { await LibraryDB.put(payload); } catch (e) {}
+  setHint(savedOk ? "已同步保存到图纸库：" + name : "已保存到本机（离线）：" + name);
+  if (nameEl) nameEl.value = "";
+  if (tagsEl) tagsEl.value = "";
+  loadLibraryList();
 }
 async function loadDrawing(id) {
+  let data = null;
   try {
-    const r = await apiJSON("/api/library/" + encodeURIComponent(id));
-    if (r && r.grid) {
-      applyDrawingData(r);
-      closeLibrary();
-      setHint("已载入图纸：" + (r.name || id));
-    } else {
-      alert("载入失败：图纸数据缺失");
-    }
-  } catch (e) {
-    alert("载入失败：" + e.message);
+    data = await apiJSON("/api/library/" + encodeURIComponent(id));
+    if (!data || !data.grid) data = null;
+  } catch (e) {}
+  if (!data) {
+    try { data = await LibraryDB.get(id); } catch (e) {}
+  }
+  if (data && data.grid) {
+    applyDrawingData(data);
+    closeLibrary();
+    setHint("已载入图纸：" + (data.name || id));
+  } else {
+    alert("载入失败：图纸数据不存在");
   }
 }
 async function deleteDrawing(id, name) {
   if (!confirm("确定删除图纸「" + name + "」？此操作不可撤销。")) return;
-  try {
-    const r = await apiJSON("/api/library/" + encodeURIComponent(id), { method: "DELETE" });
-    if (r.ok) loadLibraryList();
-    else alert("删除失败：" + (r.error || ""));
-  } catch (e) {
-    alert("删除失败：" + e.message);
-  }
+  try { await apiJSON("/api/library/" + encodeURIComponent(id), { method: "DELETE" }); } catch (e) {}
+  try { await LibraryDB.del(id); } catch (e) {}
+  loadLibraryList();
 }
 async function renameDrawing(id, name) {
   const nn = prompt("重命名图纸：", name);
   if (nn == null) return;
+  const newName = nn.trim() || name;
   try {
-    const r = await apiJSON("/api/library/" + encodeURIComponent(id), {
+    await apiJSON("/api/library/" + encodeURIComponent(id), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nn.trim() || name }),
+      body: JSON.stringify({ name: newName }),
     });
-    if (r.ok) loadLibraryList();
-    else alert("重命名失败：" + (r.error || ""));
-  } catch (e) {
-    alert("重命名失败：" + e.message);
-  }
+  } catch (e) {}
+  try {
+    const local = await LibraryDB.get(id);
+    if (local) { local.name = newName; await LibraryDB.put(local); }
+  } catch (e) {}
+  loadLibraryList();
 }
 async function loadLibraryList() {
   const grid = $("#libraryGrid");
   if (!grid) return;
   grid.innerHTML = '<p class="muted">加载中…</p>';
-  let list = [];
+  let serverList = [];
+  let localList = [];
   try {
     const data = await apiJSON("/api/library");
-    list = Array.isArray(data) ? data : [];
-  } catch (e) {
-    grid.innerHTML = '<p class="muted">读取图纸库失败：' + escapeHtml(e.message) + "</p>";
-    return;
-  }
+    serverList = Array.isArray(data) ? data : [];
+  } catch (e) {}
+  try { localList = await LibraryDB.list(); } catch (e) {}
+  const merged = new Map();
+  for (const m of serverList) merged.set(m.id, m);
+  for (const m of localList) { if (!merged.has(m.id)) merged.set(m.id, m); }
+  const list = [...merged.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (!list.length) {
-    grid.innerHTML = '<p class="muted">图纸库还是空的。先生成一张图纸，填好名称，点「保存到图纸库」。</p>';
+    grid.innerHTML = '<p class="muted">图纸库还是空的。先生成一张图纸，填好名称，点「保存到图纸库」。<br>图纸会同时保存到本机（离线可用）和服务器。</p>';
     return;
   }
   grid.innerHTML = list
@@ -1559,7 +1563,7 @@ async function loadLibraryList() {
         <div class="lib-name">${escapeHtml(m.name)}</div>
         <div class="lib-sub muted small">${m.cols}×${m.rows} 格 · ${m.w}×${m.h} cm${
         m.tags && m.tags.length ? " · " + m.tags.map(escapeHtml).join(" / ") : ""
-      }</div>
+      }${String(m.id).startsWith("local-") ? ' · <span title="仅本机，未同步到服务器" style="color:var(--accent)">&#9679; 本地</span>' : ""}</div>
         <div class="lib-actions">
           <button class="mini-btn" data-load="${m.id}">载入</button>
           <button class="mini-btn" data-rename="${m.id}" data-name="${escapeHtml(m.name)}">重命名</button>
@@ -1612,6 +1616,7 @@ function clearProject() {
     }
   );
   setHint("已新建，请上传图片或点「示例图」");
+  syncEmptyHint();
 }
 
 function makeSampleCanvas() {
@@ -1699,6 +1704,7 @@ function loadSample() {
     state._imgData = url;
     $("#runBtn").disabled = false;
     setHint("已加载示例图，可改参数或点生成");
+    syncEmptyHint();
     run();
   };
   im.src = url;
@@ -1720,6 +1726,11 @@ function hasEdits() {
 function reprocess() {
   if (hasEdits() && !confirm("重新识别会丢失当前的手动编辑，确定继续吗？")) return;
   run();
+}
+
+function syncEmptyHint() {
+  const h = $("#emptyHint");
+  if (h) h.style.display = (state.img || state.result) ? "none" : "";
 }
 
 function redraw() {
@@ -1744,6 +1755,7 @@ function redraw() {
     (id) => ($("#" + id).disabled = false)
   );
   applyView();
+  syncEmptyHint();
 }
 
 function paintCellOnCanvas(r, c) {
@@ -1768,6 +1780,7 @@ function loadImage(file) {
       state._imgData = e.target.result;
       $("#runBtn").disabled = false;
       $("#hint").textContent = `已载入：${img.width}×${img.height}px`;
+      syncEmptyHint();
       run();
     };
     img.src = e.target.result;
@@ -2519,6 +2532,15 @@ function init() {
   if (!window.jspdf || !window.jspdf.jsPDF) {
     if (ah) ah.insertAdjacentHTML("afterbegin", "⚠ PDF 库未加载，PDF 导出暂不可用（联网后刷新即可）。");
   }
+
+  const helpBtn = $("#helpBtn");
+  if (helpBtn) {
+    helpBtn.addEventListener("click", () => {
+      console.log("[helpBtn] clicked, Tutorial=", typeof Tutorial);
+      try { Tutorial.start(); } catch(e) { console.error(e); alert("教程加载失败: " + e.message); }
+    });
+  }
+  try { Tutorial.init(); } catch(e) { console.error("Tutorial.init error:", e); }
 }
 
 function insertPrompt(text) {

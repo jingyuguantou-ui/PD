@@ -31,6 +31,7 @@
         <button type="button" class="seg" data-theme="cute">奇思妙想嘉</button>
         <button type="button" class="seg active" data-theme="pixel">鲸鱼罐头</button>
       </div>
+      <button type="button" class="header-btn" id="helpBtn" title="查看使用教程">?</button>
     </div>
   </header>
 
@@ -144,6 +145,11 @@
         </div>
         <div class="canvas-wrap panel">
           <canvas id="preview"></canvas>
+          <div id="emptyHint" class="empty-hint">
+            <div class="empty-hint-icon">upload</div>
+            <div class="empty-hint-title">上传一张图片开始</div>
+            <div class="empty-hint-sub">支持 JPG / PNG / GIF / WebP<br>也可以点「示例图片」试试看</div>
+          </div>
           <div id="hoverBox" class="hover-box" hidden></div>
           <div id="cellTip" class="cell-tip" hidden></div>
         </div>
@@ -355,6 +361,8 @@
 
   <script src="js/mard-colors.js"></script>
   <script src="js/palette.js"></script>
+  <script src="js/library-db.js"></script>
+  <script src="js/tutorial.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="js/app.js"></script>
 
@@ -418,7 +426,7 @@
         <button id="libSave" class="primary" data-icon="download">保存到图纸库</button>
       </div>
       <div id="libraryGrid" class="lib-grid"></div>
-      <p class="muted small">图纸保存在本机服务器 <code>library/</code> 文件夹（每份一个 json + 缩略图），可直接备份或分享；云端同步之后再说。</p>
+      <p class="muted small">图纸自动保存到本机（离线可用）和服务器，双重保险。</p>
     </div>
   </div>
   <script>
