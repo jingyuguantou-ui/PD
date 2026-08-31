@@ -1206,6 +1206,20 @@ canvas {
   border-color: var(--primary);
 }
 
+/* iPad/移动端 ? 按钮加大 */
+@media (max-width: 860px) {
+  #helpBtn {
+    width: 42px;
+    height: 42px;
+    font-size: 18px;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+}
+
 /* ---- 图纸库弹窗 ---- */
 .lib-modal {
   width: 780px;
@@ -1331,18 +1345,23 @@ canvas {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
-  z-index: 100;
+  z-index: 2147483647;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .tut-card {
   position: relative;
-  z-index: 102;
+  z-index: 2147483647;
   width: 400px;
   max-width: 90vw;
   padding: 28px 24px 20px;
   text-align: center;
+  -webkit-tap-highlight-color: transparent;
 }
 .tut-icon {
   font-size: 36px;
@@ -1404,7 +1423,7 @@ canvas {
 }
 .tut-spotlight {
   position: fixed;
-  z-index: 101;
+  z-index: 2147483646;
   border: 3px solid var(--accent);
   border-radius: 8px;
   pointer-events: none;

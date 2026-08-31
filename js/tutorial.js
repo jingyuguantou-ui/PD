@@ -129,10 +129,15 @@ const Tutorial = (() => {
   }
 
   function init() {
-    if (!isOnboarded()) {
+    const force = new URLSearchParams(location.search).get("tutorial") === "1";
+    if (force || !isOnboarded()) {
       setTimeout(start, 600);
     }
   }
 
-  return { init, start, isOnboarded };
+  function forceShow() {
+    start();
+  }
+
+  return { init, start, forceShow, isOnboarded };
 })();

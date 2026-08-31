@@ -1793,14 +1793,24 @@ function download(href, name) {
   const link = document.createElement("a");
   link.download = name;
   link.href = href;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
+  if (href.startsWith("blob:")) setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
+function downloadCanvas(canvas, name) {
+  canvas.toBlob((blob) => {
+    if (!blob) { download(canvas.toDataURL("image/png"), name); return; }
+    const url = URL.createObjectURL(blob);
+    download(url, name);
+  }, "image/png");
 }
 
 function exportPreview() {
   if (!state.result) return;
   const c = document.createElement("canvas");
   renderPattern(c, state.result, 14, { block: false, watermark: true });
-  download(c.toDataURL("image/png"), "pindou-preview-watermark.png");
+  downloadCanvas(c, "pindou-preview-watermark.png");
 }
 
 function exportFull() {
@@ -1811,7 +1821,7 @@ function exportFull() {
   }
   const c = document.createElement("canvas");
   renderPattern(c, state.result, 24, { block: false, watermark: false });
-  download(c.toDataURL("image/png"), "pindou-full.png");
+  downloadCanvas(c, "pindou-full.png");
 }
 
 function exportPixelPng() {
@@ -1838,7 +1848,7 @@ function exportPixelPng() {
       ctx.fillRect(c2 * scale, r * scale, scale, scale);
     }
   }
-  download(c.toDataURL("image/png"), "pindou-pixel.png");
+  downloadCanvas(c, "pindou-pixel.png");
 }
 
 function buildSvg(result) {
@@ -2146,6 +2156,11 @@ function applyTheme(name) {
 }
 
 function init() {
+  if (new URLSearchParams(location.search).get("reset") === "1") {
+    try { localStorage.clear(); } catch(e) {}
+    location.replace(location.pathname);
+    return;
+  }
   const saved = (() => {
     try {
       return localStorage.getItem("pindou-theme");
@@ -2535,10 +2550,13 @@ function init() {
 
   const helpBtn = $("#helpBtn");
   if (helpBtn) {
-    helpBtn.addEventListener("click", () => {
-      console.log("[helpBtn] clicked, Tutorial=", typeof Tutorial);
-      try { Tutorial.start(); } catch(e) { console.error(e); alert("教程加载失败: " + e.message); }
-    });
+    const showHelp = (e) => {
+      if (e) e.preventDefault();
+      console.log("[helpBtn] triggered");
+      try { Tutorial.forceShow(); } catch(err) { console.error(err); alert("使用说明：\n1. 上传图片\n2. 调整参数\n3. 生成图稿\n4. 导出/保存"); }
+    };
+    helpBtn.addEventListener("click", showHelp);
+    helpBtn.addEventListener("touchend", showHelp);
   }
   try { Tutorial.init(); } catch(e) { console.error("Tutorial.init error:", e); }
 }
