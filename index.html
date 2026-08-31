@@ -26,12 +26,17 @@
       </div>
     </div>
     <div class="header-tools">
-      <button type="button" id="openLibrary" class="header-btn" data-icon="board">我的图纸</button>
+      <button type="button" id="openLibrary" class="header-btn" data-icon="board">图纸库</button>
+      <button type="button" id="openHistory" class="header-btn" data-icon="clock">最近</button>
       <div class="theme-pick" role="group" aria-label="主题风格">
-        <button type="button" class="seg" data-theme="cute">奇思妙想嘉</button>
-        <button type="button" class="seg active" data-theme="pixel">鲸鱼罐头</button>
+        <button type="button" class="seg" data-theme="cute">嘉嘉</button>
+        <button type="button" class="seg active" data-theme="pixel">罐头</button>
+        <button type="button" class="seg" data-theme="fries">薯条</button>
       </div>
+      <button type="button" class="header-btn" id="darkModeBtn" title="深色/浅色模式">🌙</button>
       <button type="button" class="header-btn" id="helpBtn" title="查看使用教程">?</button>
+      <button type="button" class="header-btn" id="shortcutsBtn" title="键盘快捷键">!</button>
+      <button type="button" class="header-btn" id="versionsBtn" title="版本历史">v</button>
     </div>
   </header>
 
@@ -48,9 +53,14 @@
           <button class="controls-toggle" type="button">图片与配色设置 <span class="chev">▾</span></button>
         </div>
         <div class="controls-body">
+        <div class="controls-basic">
         <label class="field">
           图片
           <input type="file" id="file" accept="image/*" />
+        </label>
+        <label class="field">
+          批量转换
+          <input type="file" id="batchFile" accept="image/*" multiple />
         </label>
         <button id="sampleBtn" type="button" data-icon="image">示例图</button>
         <label class="field">
@@ -61,6 +71,27 @@
           色板大小
           <select id="paletteSize"></select>
         </label>
+        <label class="field">
+          横向珠数
+          <select id="cols">
+            <option value="20">20（小）</option>
+            <option value="29">29（标准板）</option>
+            <option value="40">40</option>
+            <option value="58" selected>58（大板）</option>
+            <option value="80">80（高清）</option>
+            <option value="104">104（超清）</option>
+            <option value="144">144（巨幅）</option>
+          </select>
+          <span class="hint">29≈1块标准板(约14cm)，58≈4块。</span>
+        </label>
+        <button id="editToggle" type="button" data-icon="pen" disabled>编辑</button>
+        <button id="runBtn" data-icon="image" disabled>生成图稿</button>
+        <button id="newBtn" type="button" data-icon="file">新建</button>
+        <span id="hint" class="hint">请先上传图片</span>
+        </div><!-- /controls-basic -->
+        <div class="controls-advanced">
+          <button class="adv-toggle" type="button">更多设置 <span class="chev">▾</span></button>
+          <div class="adv-body">
         <label class="field">
           配色模式
           <select id="colorMode">
@@ -89,26 +120,13 @@
         <label class="field">
           背景容差
           <input type="range" id="bgTol" min="10" max="120" step="5" value="40" />
-          <span class="hint">从图片四边识别背景并留空（不消耗珠子）。容差越小只去掉最像边缘色的区域；即便背景色与人物同色，只要人物不连到边缘就会保留。</span>
+          <span class="hint">容差越小只去掉最像边缘色的区域。</span>
         </label>
         <label class="field check">
           <input type="checkbox" id="edgeAware" /> 边缘感知去背景（保留人物描边）
         </label>
         <label class="field check">
           <input type="checkbox" id="outlineMode" /> 线稿描边（轮廓统一深色珠）
-        </label>
-        <label class="field">
-          横向珠数
-          <select id="cols">
-            <option value="20">20（小）</option>
-            <option value="29">29（标准板）</option>
-            <option value="40">40</option>
-            <option value="58" selected>58（大板）</option>
-            <option value="80">80（高清）</option>
-            <option value="104">104（超清）</option>
-            <option value="144">144（巨幅）</option>
-          </select>
-          <span class="hint">珠数越多越精细；29≈1 块标准板(约14cm)，58≈4 块，144≈巨幅多板。</span>
         </label>
         <label class="field check">
           <input type="checkbox" id="mode" /> 图纸模式（带符号/坐标）
@@ -126,10 +144,9 @@
           </select>
           <span class="hint">仅影响分块打印/裁切的每页板型，不改变画布内容。</span>
         </label>
-        <button id="editToggle" type="button" data-icon="pen" disabled>编辑</button>
-        <button id="runBtn" data-icon="image" disabled>生成图稿</button>
-        <button id="newBtn" type="button" data-icon="file">新建</button>
-          <span id="hint" class="hint">请先上传图片</span>
+        <button id="calcBtn" type="button" title="拼豆尺寸计算器">计算</button>
+          </div><!-- /adv-body -->
+        </div><!-- /controls-advanced -->
         </div><!-- /controls-body -->
         </div><!-- /controls -->
 
@@ -141,6 +158,8 @@
           <span id="zoomLabel">100%</span>
           <button id="zoomIn" type="button">＋</button>
           <button id="zoom100" type="button">实际大小</button>
+          <button id="snapshotBtn" type="button" disabled>快照</button>
+          <button id="compareSnapshotBtn" type="button" disabled>对比快照</button>
           <span class="vtip">可拖拽/触摸平移 · 滚轮/双指缩放</span>
         </div>
         <div class="canvas-wrap panel">
@@ -163,7 +182,14 @@
             <button id="exportPdf" data-icon="pdf" disabled>导出分块打印 PDF（Pro·A4 分页）</button>
             <button id="exportPack" data-icon="package" disabled>导出材料包清单（免费）</button>
               <button id="exportBoards" data-icon="grid" disabled>导出分板裁切图（每板一页 PDF·Pro）</button>
+              <div class="export-fmt-group">
+                <span class="muted small">更多格式：</span>
+                <button id="exportJpg" class="mini-btn" disabled>导出 JPG</button>
+                <button id="exportBmp" class="mini-btn" disabled>导出 BMP</button>
+              </div>
+              <button id="compareBtn" data-icon="eye" disabled>原图 vs 图稿对比</button>
               <button id="upgradePro" class="pro-cta" data-icon="star">升级 Pro / 解锁全部功能</button>
+              <button id="shareBtn" data-icon="code" disabled>生成分享链接</button>
             </div>
             <button id="exportMenuBtn" class="export-fab" type="button">导出 <span class="chev">▾</span></button>
 
@@ -174,8 +200,24 @@
           <label class="field check">
             <input type="checkbox" id="pixelWhiteBg" /> 逐格像素图：背景填白（默认透明，部分 App 把透明当地时用填白更稳）
           </label>
+          <div class="watermark-settings">
+            <div class="wm-title muted small">水印设置（预览图）</div>
+            <label class="field">
+              水印文字
+              <input type="text" id="watermarkText" class="field" value="拼豆图稿平台" maxlength="30" />
+            </label>
+            <label class="field">
+              透明度 <span id="wmOpacityVal" class="muted">10%</span>
+              <input type="range" id="watermarkOpacity" min="0" max="50" value="10" step="1" />
+            </label>
+            <label class="field">
+              角度 <span id="wmAngleVal" class="muted">-30°</span>
+              <input type="range" id="watermarkAngle" min="-90" max="90" value="-30" step="5" />
+            </label>
+          </div>
           <div class="actions-hint muted small">免费：预览图（带水印）+ 逐格像素图（用于豆画 / 颂拼豆）+ 材料包清单 · Pro：去水印高清 / 矢量 / 分块打印 PDF / 分板裁切图 · PDF 需联网加载库</div>
               <div id="legend" class="legend panel"></div>
+              <div id="materialsPanel" class="materials-panel panel" hidden></div>
             </div><!-- /details-body -->
           </div><!-- /details -->
 
@@ -192,6 +234,7 @@
               <button type="button" class="tool-btn" data-tool="select" data-icon="select" title="选择 (S)">选择</button>
               <button type="button" class="tool-btn" data-tool="text" data-icon="text" title="文字 (T)">文字</button>
               <button type="button" class="tool-btn" data-tool="view" data-icon="eye" title="查看 (V)">查看</button>
+              <button type="button" class="tool-btn" data-tool="replace" data-icon="swap" title="换色 (X)">换色</button>
             </div>
             <div class="edit-tools-row">
               <div class="edit-current">
@@ -363,6 +406,12 @@
   <script src="js/palette.js"></script>
   <script src="js/library-db.js"></script>
   <script src="js/tutorial.js"></script>
+  <script src="js/features.js"></script>
+  <script src="js/versions.js"></script>
+  <script src="js/shortcuts.js"></script>
+  <script src="js/error-boundary.js"></script>
+  <script src="js/ipad-fixes.js"></script>
+  <script src="js/tests.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="js/app.js"></script>
 

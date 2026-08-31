@@ -1,4 +1,4 @@
-const CACHE = "pindou-v3";
+const CACHE = "pindou-v4";
 const ASSETS = [
   ".",
   "index.html",
@@ -6,6 +6,15 @@ const ASSETS = [
   "js/app.js",
   "js/palette.js",
   "js/mard-colors.js",
+  "js/library-db.js",
+  "js/tutorial.js",
+  "js/features.js",
+  "js/versions.js",
+  "js/shortcuts.js",
+  "js/error-boundary.js",
+  "js/ipad-fixes.js",
+  "js/tests.js",
+  "config.js",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/icon-maskable-512.png",

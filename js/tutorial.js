@@ -1,37 +1,37 @@
 /**
- * tutorial.js — 首次使用引导 + 空状态提示
+ * tutorial.js — 首次使用引导（步骤条 + 区域高亮）
  */
 const Tutorial = (() => {
   const STORAGE_KEY = "pindou-onboarded";
   const steps = [
     {
-      title: "欢迎使用拼豆图稿生成器",
-      text: "把图片变成拼豆像素图，还能直接导出打印图纸。<br><br>整个过程只需要 4 步，跟我来。",
-      icon: " whale",
+      title: "欢迎",
+      text: "把图片变成拼豆像素图，还能直接导出打印图纸。<br>整个过程只需要 4 步，跟我来。",
+      icon: "🐳",
     },
     {
-      title: "① 上传图片",
-      text: "点左侧「选择图片」上传一张照片或插画。<br><br>支持 JPG / PNG / GIF / WebP，背景简单的图效果最好。",
-      icon: " image",
+      title: "上传图片",
+      text: "点「选择图片」上传一张照片或插画。<br>支持 JPG / PNG / GIF / WebP，背景简单的图效果最好。",
+      icon: "📷",
       highlight: "#file",
     },
     {
-      title: "② 调整配色与尺寸",
-      text: "选择拼豆品牌（默认 MARD 291 色），设置格子宽度。<br><br>「自动抠图」会去掉背景，「高级设置」里还能调容差和描边。",
-      icon: " palette",
-      highlight: ".controls-toggle",
+      title: "调整设置",
+      text: "选择拼豆品牌、格子宽度。<br>「自动抠图」去掉背景，「更多设置」里还能调容差和描边。",
+      icon: "🎨",
+      highlight: ".controls-basic",
     },
     {
-      title: "③ 生成图稿",
-      text: "点「生成图稿」，等几秒就能看到像素化结果。<br><br>可以拖拽平移、滚轮缩放，逐格查看颜色。",
-      icon: " sparkles",
+      title: "生成图稿",
+      text: "点「生成图稿」，等几秒就能看到像素化结果。<br>可以拖拽平移、滚轮缩放，逐格查看颜色。",
+      icon: "✨",
       highlight: "#runBtn",
     },
     {
-      title: "④ 导出与保存",
-      text: "右侧有多种导出方式：预览图（免费）、高清 PNG / SVG / PDF（Pro）、材料包清单。<br><br>点「保存图纸」可以把作品存到图纸库，下次接着用。",
-      icon: " download",
-      highlight: "#exportMenuBtn",
+      title: "导出保存",
+      text: "右侧面板有多种导出方式：预览图、高清图、SVG、PDF、材料包清单。<br>点「保存图纸」可以存到图纸库。",
+      icon: "📦",
+      highlight: ".side",
     },
   ];
 
@@ -51,21 +51,19 @@ const Tutorial = (() => {
     overlay = document.createElement("div");
     overlay.id = "tutorialOverlay";
     overlay.innerHTML = `
-      <div class="tut-card panel">
-        <div class="tut-icon" id="tutIcon"></div>
-        <div class="tut-title" id="tutTitle"></div>
+      <div class="tut-sidebar panel" id="tutSidebar">
+        <div class="tut-sidebar-title">快速上手</div>
+        <div class="tut-steps" id="tutSteps"></div>
         <div class="tut-text" id="tutText"></div>
-        <div class="tut-dots" id="tutDots"></div>
         <div class="tut-actions">
           <button class="tut-btn tut-skip" id="tutSkip">跳过</button>
-          <button class="tut-btn tut-prev" id="tutPrev" style="display:none">上一步</button>
-          <button class="tut-btn primary tut-next" id="tutNext">开始</button>
+          <button class="tut-btn tut-prev" id="tutPrev" style="display:none">← 上一步</button>
+          <button class="tut-btn primary tut-next" id="tutNext">开始 →</button>
         </div>
       </div>
       <div class="tut-spotlight" id="tutSpotlight"></div>
     `;
     document.body.appendChild(overlay);
-    console.log("[Tutorial] overlay appended to body, children:", overlay.childNodes.length);
     document.getElementById("tutSkip").addEventListener("click", close);
     document.getElementById("tutPrev").addEventListener("click", prev);
     document.getElementById("tutNext").addEventListener("click", next);
@@ -76,16 +74,18 @@ const Tutorial = (() => {
 
   function render() {
     const s = steps[currentStep];
-    document.getElementById("tutIcon").textContent = s.icon;
-    document.getElementById("tutTitle").textContent = s.title;
+    const stepsEl = document.getElementById("tutSteps");
+    stepsEl.innerHTML = steps.map((st, i) => {
+      const state = i < currentStep ? "done" : i === currentStep ? "active" : "pending";
+      return `<div class="tut-step ${state}">
+        <span class="tut-step-num">${i < currentStep ? "✓" : (i + 1)}</span>
+        <span class="tut-step-label">${st.title}</span>
+      </div>`;
+    }).join("");
     document.getElementById("tutText").innerHTML = s.text;
-    const dots = document.getElementById("tutDots");
-    dots.innerHTML = steps.map((_, i) =>
-      `<span class="tut-dot${i === currentStep ? " active" : ""}"></span>`
-    ).join("");
     document.getElementById("tutPrev").style.display = currentStep > 0 ? "" : "none";
     const nextBtn = document.getElementById("tutNext");
-    nextBtn.textContent = currentStep === steps.length - 1 ? "开始使用" : "下一步";
+    nextBtn.textContent = currentStep === steps.length - 1 ? "开始使用 →" : "下一步 →";
     const spotlight = document.getElementById("tutSpotlight");
     if (s.highlight) {
       const el = document.querySelector(s.highlight);
@@ -121,11 +121,9 @@ const Tutorial = (() => {
   }
 
   function start() {
-    console.log("[Tutorial] start called");
     currentStep = 0;
     createOverlay();
     render();
-    console.log("[Tutorial] overlay created:", !!overlay);
   }
 
   function init() {
