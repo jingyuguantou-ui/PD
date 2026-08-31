@@ -1374,7 +1374,7 @@ const History = (() => {
     state.mode = p.p.mode;
     state.showGhost = p.p.showGhost;
     if (p.grid) {
-      const palette = getPalette(state.paletteKey, state.paletteSize);
+      const palette = getActivePalette(state.paletteKey, state.paletteSize);
       state.result = {
         grid: p.grid,
         cols: p.gcols,
@@ -2645,12 +2645,19 @@ function applyIcons() {
 
 function applyTheme(name) {
   document.body.setAttribute("data-theme", name);
-  try {
-    localStorage.setItem("pindou-theme", name);
-  } catch (e) {}
+  try { localStorage.setItem("pindou-theme", name); } catch (e) {}
   document.querySelectorAll(".theme-pick .seg").forEach((b) => {
     b.classList.toggle("active", b.dataset.theme === name);
   });
+  const themeColors = { pixel: "#2b6cff", cute: "#ff6f9c", fries: "#DA291C" };
+  const bgColors = { pixel: "#eef2f8", cute: "#fff4f7", fries: "#FFF8E7" };
+  const tc = themeColors[name] || "#2b6cff";
+  const bc = bgColors[name] || "#eef2f8";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", tc);
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: "update-manifest", theme_color: tc, background_color: bc });
+  }
 }
 
 function init() {
@@ -2667,6 +2674,16 @@ function init() {
     }
   })();
   applyTheme(saved || "pixel");
+
+  document.querySelectorAll(".lang-pick .seg").forEach((b) => {
+    b.classList.toggle("active", b.dataset.lang === I18N.getLang());
+    b.addEventListener("click", () => {
+      I18N.setLang(b.dataset.lang);
+      document.querySelectorAll(".lang-pick .seg").forEach((s) => s.classList.toggle("active", s.dataset.lang === b.dataset.lang));
+      I18N.applyTranslations();
+    });
+  });
+  I18N.applyTranslations();
 
   const pal = $("#palette");
   for (const key of Object.keys(BEAD_PALETTES)) {
@@ -3041,6 +3058,14 @@ function init() {
       const isDark = document.body.classList.contains("dark-mode");
       darkBtn.textContent = isDark ? "☀️" : "🌙";
       try { localStorage.setItem("pindou-dark", isDark ? "1" : "0"); } catch(e) {}
+      const themeColors = { pixel: "#2b6cff", cute: "#ff6f9c", fries: "#DA291C" };
+      const currentTheme = document.body.getAttribute("data-theme") || "pixel";
+      const tc = isDark ? "#1a1a2e" : (themeColors[currentTheme] || "#2b6cff");
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", tc);
+      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: "update-manifest", theme_color: tc, background_color: isDark ? "#0f0f1e" : "#eef2f8" });
+      }
     });
   }
 
@@ -3049,19 +3074,11 @@ function init() {
     const t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
     if (!state.editing) return;
-    const map = {
-      b: "paint",
-      e: "erase",
-      i: "pick",
-      g: "fill",
-      l: "line",
-      r: "rect",
-      o: "ellipse",
-      s: "select",
-      t: "text",
-      v: "view",
-    };
-    const tool = map[e.key.toLowerCase()];
+    const toolMap = {};
+    for (const [tool, key] of Object.entries(Shortcuts.getAllBindings())) {
+      toolMap[key] = tool;
+    }
+    const tool = toolMap[e.key.toLowerCase()];
     if (tool) {
       setTool(tool);
       e.preventDefault();

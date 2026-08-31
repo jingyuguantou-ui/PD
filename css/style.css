@@ -1923,3 +1923,23 @@ body.drag-active .empty-hint-icon {
   font-weight: 900;
   font-size: 15px;
 }
+
+/* ---- 语言切换 ---- */
+.lang-pick {
+  display: flex;
+  border: 2px solid var(--border-strong);
+  background: var(--panel-2);
+}
+.lang-pick .seg {
+  padding: 2px 8px;
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
+}
+.lang-pick .seg.active {
+  background: var(--primary);
+  color: #fff;
+}
