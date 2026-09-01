@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>平板预览 · 拼豆图稿平台</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --frame: #1b1e24;
+      --line: #2a2e37;
+      --text: #e7e9ee;
+      --muted: #9aa0ad;
+      --accent: #4f7cff;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #1a2233 0, transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 12px 32px;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin: 0;
+      color: var(--muted);
+    }
+    .bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+    }
+    .bar .label { color: var(--muted); font-size: 13px; margin-right: 4px; }
+    .bar button {
+      background: var(--frame);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .bar button:hover { border-color: var(--accent); }
+    .bar button.active {
+      border-color: var(--accent);
+      color: #fff;
+      background: #243156;
+    }
+    .tablet {
+      position: relative;
+      background: #000;
+      border-radius: 22px;
+      padding: 14px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 2px #2c2f37;
+    }
+    .cam {
+      position: absolute;
+      top: 22px;
+      left: 22px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #1a1c22;
+      box-shadow: 0 0 0 2px #05060a;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .screen {
+      width: 768px;
+      height: 1024px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .screen iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+    .tip { color: var(--muted); font-size: 12px; text-align: center; max-width: 560px; line-height: 1.6; }
+    .tip b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <h1>平板预览模式 · 在电脑上模拟平板界面</h1>
+  <div class="bar">
+    <span class="label">设备</span>
+    <button data-w="768" data-h="1024" class="active">iPad Mini 768</button>
+    <button data-w="810" data-h="1080">iPad 810</button>
+    <button data-w="820" data-h="1180">iPad Air 820</button>
+    <button data-w="1024" data-h="1366">iPad Pro 1024</button>
+    <span class="label" style="margin-left:8px">方向</span>
+    <button id="rotateBtn">⇄ 横屏</button>
+  </div>
+
+  <div class="tablet">
+    <div class="cam"></div>
+    <div class="screen" id="screen">
+      <iframe src="index.html" title="拼豆图稿平台（平板预览）"></iframe>
+    </div>
+  </div>
+
+  <p class="tip">
+    把真实应用放进 <b>平板尺寸的 iframe</b>：宽度 ≤ 860 会套用移动端样式（可折叠设置、底部导出、画布优先），≥ 860 则是桌面布局。<br />
+    点「⇄ 横屏」可切换横竖屏，切尺寸/方向会自动重载以重新套用样式。
+  </p>
+
+  <script>
+    const screen = document.getElementById("screen");
+    let curW = 768, curH = 1024;
+    function apply() {
+      screen.style.width = curW + "px";
+      screen.style.height = curH + "px";
+      const f = screen.querySelector("iframe");
+      f.src = f.src;
+    }
+    document.querySelectorAll(".bar button[data-w]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".bar button[data-w]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        curW = parseInt(btn.dataset.w, 10);
+        curH = parseInt(btn.dataset.h, 10);
+        apply();
+      });
+    });
+    document.getElementById("rotateBtn").addEventListener("click", () => {
+      const t = curW; curW = curH; curH = t;
+      apply();
+    });
+  </script>
+</body>
+</html>

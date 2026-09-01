@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>手机预览 · 拼豆图稿平台</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --frame: #1b1e24;
+      --line: #2a2e37;
+      --text: #e7e9ee;
+      --muted: #9aa0ad;
+      --accent: #4f7cff;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #1a2233 0, transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 12px 32px;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin: 0;
+      color: var(--muted);
+    }
+    .bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+    }
+    .bar .label { color: var(--muted); font-size: 13px; margin-right: 4px; }
+    .bar button {
+      background: var(--frame);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .bar button:hover { border-color: var(--accent); }
+    .bar button.active {
+      border-color: var(--accent);
+      color: #fff;
+      background: #243156;
+    }
+    .phone {
+      position: relative;
+      background: #000;
+      border-radius: 44px;
+      padding: 12px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 2px #2c2f37, inset 0 0 0 12px #0a0c10;
+    }
+    .notch {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 150px;
+      height: 26px;
+      background: #0a0c10;
+      border-radius: 0 0 16px 16px;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .screen {
+      width: 390px;
+      height: 800px;
+      border-radius: 32px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .screen iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+    .tip { color: var(--muted); font-size: 12px; text-align: center; max-width: 420px; line-height: 1.6; }
+    .tip b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <h1>手机预览模式 · 在电脑上模拟移动端界面</h1>
+  <div class="bar">
+    <span class="label">设备</span>
+    <button data-w="360" data-h="780">小屏 360</button>
+    <button data-w="375" data-h="812" class="active">iPhone SE 375</button>
+    <button data-w="390" data-h="844">iPhone 12 390</button>
+    <button data-w="414" data-h="896">Plus 414</button>
+    <button data-w="768" data-h="1024">iPad 768</button>
+  </div>
+
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="screen" id="screen">
+      <iframe src="index.html" title="拼豆图稿平台（移动端预览）"></iframe>
+    </div>
+  </div>
+
+  <p class="tip">
+    此页把真实应用放进 <b>手机尺寸的 iframe</b>，因此会自动套用移动端样式（可折叠设置、底部固定导出栏、画布优先）。<br />
+    直接在这里上传图片 / 点示例图即可体验；切设备按钮可换宽度。<b>竖屏效果最佳</b>。
+  </p>
+
+  <script>
+    const screen = document.getElementById("screen");
+    document.querySelectorAll(".bar button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".bar button").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const w = btn.dataset.w;
+        const h = btn.dataset.h;
+        screen.style.width = w + "px";
+        screen.style.height = h + "px";
+        // 重新加载 iframe 以应用新视口下的媒体查询
+        const f = screen.querySelector("iframe");
+        f.src = f.src;
+      });
+    });
+  </script>
+</body>
+</html>
