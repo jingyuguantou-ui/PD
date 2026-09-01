@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#2b6cff" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -21,62 +21,83 @@
         </svg>
       </span>
       <div class="brand-text">
-        <h1 data-i18n="brand.title">鲸鱼罐头 · 拼豆图稿</h1>
-        <p class="sub" data-i18n="brand.sub">图片转图稿 · AI 生图 · 色卡校验</p>
+        <h1>鲸鱼罐头 · 拼豆图稿</h1>
+        <p class="sub">图片转图稿 · AI 生图 · 色卡校验</p>
       </div>
     </div>
     <div class="header-tools">
-      <button type="button" id="openLibrary" class="header-btn" data-icon="board" data-i18n="header.library">图纸库</button>
-      <button type="button" id="openHistory" class="header-btn" data-icon="clock" data-i18n="header.history">最近</button>
-      <div class="lang-pick" role="group" aria-label="Language">
-        <button type="button" class="seg" data-lang="en">EN</button>
-        <button type="button" class="seg active" data-lang="zh">中</button>
-      </div>
+      <button type="button" id="openLibrary" class="header-btn" data-icon="board">我的图纸</button>
       <div class="theme-pick" role="group" aria-label="主题风格">
-        <button type="button" class="seg" data-theme="cute">嘉嘉</button>
-        <button type="button" class="seg active" data-theme="pixel">罐头</button>
-        <button type="button" class="seg" data-theme="fries">薯条</button>
+        <button type="button" class="seg" data-theme="cute">奇思妙想嘉</button>
+        <button type="button" class="seg active" data-theme="pixel">鲸鱼罐头</button>
       </div>
-      <button type="button" class="header-btn" id="darkModeBtn" title="深色/浅色模式">🌙</button>
-      <button type="button" class="header-btn" id="helpBtn" title="查看使用教程">?</button>
-      <button type="button" class="header-btn" id="shortcutsBtn" title="键盘快捷键">!</button>
-      <button type="button" class="header-btn" id="versionsBtn" title="版本历史">v</button>
     </div>
   </header>
 
   <nav class="tabs">
-    <button class="tabbtn active" data-tab="convert" data-icon="image" data-i18n="tab.convert">图片转图稿</button>
-    <button class="tabbtn" data-tab="ai" data-icon="sparkles" data-i18n="tab.ai">AI 生图</button>
-    <button class="tabbtn" data-tab="swatch" data-icon="palette" data-i18n="tab.swatch">色卡校验</button>
+    <button class="tabbtn active" data-tab="convert" data-icon="image">图片转图稿</button>
+    <button class="tabbtn" data-tab="ai" data-icon="sparkles">AI 生图</button>
+    <button class="tabbtn" data-tab="swatch" data-icon="palette">色卡校验</button>
   </nav>
 
   <main>
     <section class="tabpanel" data-tab="convert">
       <div class="controls panel">
         <div class="controls-head">
-          <button class="controls-toggle" type="button"><span data-i18n="ctrl.settings">图片与配色设置</span> <span class="chev">▾</span></button>
+          <button class="controls-toggle" type="button">图片与配色设置 <span class="chev">▾</span></button>
         </div>
         <div class="controls-body">
-        <div class="controls-basic">
         <label class="field">
-          <span data-i18n="ctrl.image">图片</span>
+          图片
           <input type="file" id="file" accept="image/*" />
         </label>
+        <button id="sampleBtn" type="button" data-icon="image">示例图</button>
         <label class="field">
-          <span data-i18n="ctrl.batch">批量转换</span>
-          <input type="file" id="batchFile" accept="image/*" multiple />
-        </label>
-        <button id="sampleBtn" type="button" data-icon="image" data-i18n="ctrl.sample">示例图</button>
-        <label class="field">
-          <span data-i18n="ctrl.palette">珠色品牌</span>
+          珠色品牌
           <select id="palette"></select>
         </label>
         <label class="field">
-          <span data-i18n="ctrl.paletteSize">色板大小</span>
+          色板大小
           <select id="paletteSize"></select>
         </label>
         <label class="field">
-          <span data-i18n="ctrl.cols">横向珠数</span>
+          配色模式
+          <select id="colorMode">
+            <option value="palette">品牌珠色</option>
+            <option value="original">保留原色</option>
+          </select>
+          <span class="hint">品牌珠色=用官方色号（可买）；保留原色=显示接近的实色（无编号）。</span>
+        </label>
+        <label class="field">
+          目标颜色数
+          <select id="maxColors">
+            <option value="0" selected>不限制（原样）</option>
+            <option value="6">6 色</option>
+            <option value="8">8 色</option>
+            <option value="10">10 色</option>
+            <option value="12">12 色</option>
+            <option value="16">16 色</option>
+            <option value="24">24 色</option>
+            <option value="32">32 色</option>
+          </select>
+          <span class="hint">将识别出的颜色聚合为指定数量（类似 PS 减少颜色），不影响尺寸与板子。</span>
+        </label>
+        <label class="field check">
+          <input type="checkbox" id="removeBg" checked /> 去背景（不计入珠数）
+        </label>
+        <label class="field">
+          背景容差
+          <input type="range" id="bgTol" min="10" max="120" step="5" value="40" />
+          <span class="hint">从图片四边识别背景并留空（不消耗珠子）。容差越小只去掉最像边缘色的区域；即便背景色与人物同色，只要人物不连到边缘就会保留。</span>
+        </label>
+        <label class="field check">
+          <input type="checkbox" id="edgeAware" /> 边缘感知去背景（保留人物描边）
+        </label>
+        <label class="field check">
+          <input type="checkbox" id="outlineMode" /> 线稿描边（轮廓统一深色珠）
+        </label>
+        <label class="field">
+          横向珠数
           <select id="cols">
             <option value="20">20（小）</option>
             <option value="29">29（标准板）</option>
@@ -86,159 +107,84 @@
             <option value="104">104（超清）</option>
             <option value="144">144（巨幅）</option>
           </select>
-          <span class="hint" data-i18n="ctrl.colsHint">29≈1块标准板(约14cm)，58≈4块。</span>
+          <span class="hint">珠数越多越精细；29≈1 块标准板(约14cm)，58≈4 块，144≈巨幅多板。</span>
         </label>
-        <button id="editToggle" type="button" data-icon="pen" disabled data-i18n="ctrl.edit">编辑</button>
-        <button id="runBtn" data-icon="image" disabled data-i18n="ctrl.generate">生成图稿</button>
-        <button id="newBtn" type="button" data-icon="file" data-i18n="ctrl.new">新建</button>
-        <span id="hint" class="hint" data-i18n="ctrl.hint.upload">请先上传图片</span>
-        </div><!-- /controls-basic -->
-        <div class="controls-advanced">
-          <button class="adv-toggle" type="button"><span data-i18n="adv.title">更多设置</span> <span class="chev">▾</span></button>
-          <div class="adv-body">
-        <label class="field">
-          <span data-i18n="adv.colorMode">配色模式</span>
-          <select id="colorMode">
-            <option value="palette" data-i18n="adv.colorMode.brand">品牌珠色</option>
-            <option value="original" data-i18n="adv.colorMode.original">保留原色</option>
-          </select>
-          <span class="hint" data-i18n="adv.colorMode.hint">品牌珠色=用官方色号（可买）；保留原色=显示接近的实色（无编号）。</span>
+        <label class="field check">
+          <input type="checkbox" id="mode" /> 图纸模式（带符号/坐标）
+        </label>
+        <label class="field check">
+          <input type="checkbox" id="ghost" /> 对比原图（半透明叠加）
         </label>
         <label class="field">
-          <span data-i18n="adv.maxColors">目标颜色数</span>
-          <select id="maxColors">
-            <option value="0" selected data-i18n="adv.maxColors.none">不限制（原样）</option>
-            <option value="6">6 色</option>
-            <option value="8">8 色</option>
-            <option value="10">10 色</option>
-            <option value="12">12 色</option>
-            <option value="16">16 色</option>
-            <option value="24">24 色</option>
-            <option value="32">32 色</option>
-          </select>
-          <span class="hint" data-i18n="adv.maxColors.hint">将识别出的颜色聚合为指定数量（类似 PS 减少颜色），不影响尺寸与板子。</span>
-        </label>
-        <label class="field check">
-          <input type="checkbox" id="removeBg" checked /> <span data-i18n="adv.removeBg">去背景（不计入珠数）</span>
-        </label>
-        <label class="field">
-          <span data-i18n="adv.bgTol">背景容差</span>
-          <input type="range" id="bgTol" min="10" max="120" step="5" value="40" />
-          <span class="hint" data-i18n="adv.bgTol.hint">容差越小只去掉最像边缘色的区域。</span>
-        </label>
-        <label class="field check">
-          <input type="checkbox" id="edgeAware" /> <span data-i18n="adv.edgeAware">边缘感知去背景（保留人物描边）</span>
-        </label>
-        <label class="field check">
-          <input type="checkbox" id="outlineMode" /> <span data-i18n="adv.outlineMode">线稿描边（轮廓统一深色珠）</span>
-        </label>
-        <label class="field check">
-          <input type="checkbox" id="mode" /> <span data-i18n="adv.mode">图纸模式（带符号/坐标）</span>
-        </label>
-        <label class="field check">
-          <input type="checkbox" id="ghost" /> <span data-i18n="adv.ghost">对比原图（半透明叠加）</span>
-        </label>
-        <label class="field">
-          <span data-i18n="adv.board">板子方向（分块打印）</span>
+          板子方向（分块打印）
           <select id="boardOrientation">
-            <option value="square" selected data-i18n="adv.board.square">正方 29×29</option>
-            <option value="h" data-i18n="adv.board.h">横向 58×29</option>
-            <option value="v" data-i18n="adv.board.v">竖向 29×58</option>
-            <option value="big" data-i18n="adv.board.big">大方板 58×58</option>
+            <option value="square" selected>正方 29×29</option>
+            <option value="h">横向 58×29</option>
+            <option value="v">竖向 29×58</option>
+            <option value="big">大方板 58×58</option>
           </select>
-          <span class="hint" data-i18n="adv.board.hint">仅影响分块打印/裁切的每页板型，不改变画布内容。</span>
+          <span class="hint">仅影响分块打印/裁切的每页板型，不改变画布内容。</span>
         </label>
-        <button id="calcBtn" type="button" title="拼豆尺寸计算器" data-i18n="adv.calc">计算</button>
-          </div><!-- /adv-body -->
-        </div><!-- /controls-advanced -->
+        <button id="editToggle" type="button" data-icon="pen" disabled>编辑</button>
+        <button id="runBtn" data-icon="image" disabled>生成图稿</button>
+        <button id="newBtn" type="button" data-icon="file">新建</button>
+          <span id="hint" class="hint">请先上传图片</span>
         </div><!-- /controls-body -->
         </div><!-- /controls -->
 
       <div class="output">
         <div class="viewbar">
-          <span class="vlabel" data-i18n="view.preview">预览：</span>
-          <button id="zoomFit" type="button" data-i18n="view.fit">适应宽度</button>
+          <span class="vlabel">预览：</span>
+          <button id="zoomFit" type="button">适应宽度</button>
           <button id="zoomOut" type="button">－</button>
           <span id="zoomLabel">100%</span>
           <button id="zoomIn" type="button">＋</button>
-          <button id="zoom100" type="button" data-i18n="view.actual">实际大小</button>
-          <button id="snapshotBtn" type="button" disabled data-i18n="view.snapshot">快照</button>
-          <button id="compareSnapshotBtn" type="button" disabled data-i18n="view.compareSnapshot">对比快照</button>
-          <span class="vtip" data-i18n="view.hint">可拖拽/触摸平移 · 滚轮/双指缩放</span>
+          <button id="zoom100" type="button">实际大小</button>
+          <span class="vtip">可拖拽/触摸平移 · 滚轮/双指缩放</span>
         </div>
         <div class="canvas-wrap panel">
           <canvas id="preview"></canvas>
-          <div id="emptyHint" class="empty-hint">
-            <div class="empty-hint-icon">upload</div>
-            <div class="empty-hint-title" data-i18n="empty.upload">上传一张图片开始</div>
-            <div class="empty-hint-sub" data-i18n="empty.sub">支持 JPG / PNG / GIF / WebP<br>也可以点「示例图片」试试看</div>
-          </div>
           <div id="hoverBox" class="hover-box" hidden></div>
           <div id="cellTip" class="cell-tip" hidden></div>
         </div>
         <aside class="side">
           <div class="actions">
-            <button id="saveDrawingBtn" class="save-cta" data-icon="download" disabled data-i18n="export.save">保存图纸</button>
-            <button id="exportPreview" data-icon="image" disabled data-i18n="export.preview">导出预览图 PNG（免费·带水印）</button>
-            <button id="exportPixel" data-icon="layers" disabled data-i18n="export.pixel">导出逐格像素图 PNG（免费·用于豆画 / 颂拼豆）</button>
-            <button id="exportFull" data-icon="download" disabled data-i18n="export.full">导出完整高清图 PNG（Pro）</button>
-            <button id="exportSvg" data-icon="code" disabled data-i18n="export.svg">导出矢量 SVG（Pro）</button>
-            <button id="exportPdf" data-icon="pdf" disabled data-i18n="export.pdf">导出分块打印 PDF（Pro·A4 分页）</button>
-            <button id="exportPack" data-icon="package" disabled data-i18n="export.pack">导出材料包清单（免费）</button>
-              <button id="exportBoards" data-icon="grid" disabled data-i18n="export.boards">导出分板裁切图（每板一页 PDF·Pro）</button>
-              <div class="export-fmt-group">
-                <span class="muted small" data-i18n="export.more">更多格式：</span>
-                <button id="exportJpg" class="mini-btn" disabled data-i18n="export.jpg">导出 JPG</button>
-                <button id="exportBmp" class="mini-btn" disabled data-i18n="export.bmp">导出 BMP</button>
-              </div>
-              <button id="compareBtn" data-icon="eye" disabled data-i18n="export.compare">原图 vs 图稿对比</button>
-              <button id="upgradePro" class="pro-cta" data-icon="star" data-i18n="export.pro">升级 Pro / 解锁全部功能</button>
-              <button id="shareBtn" data-icon="code" disabled data-i18n="export.share">生成分享链接</button>
+            <button id="saveDrawingBtn" class="save-cta" data-icon="download" disabled>保存图纸</button>
+            <button id="exportPreview" data-icon="image" disabled>导出预览图 PNG（免费·带水印）</button>
+            <button id="exportPixel" data-icon="layers" disabled>导出逐格像素图 PNG（免费·用于豆画 / 颂拼豆）</button>
+            <button id="exportFull" data-icon="download" disabled>导出完整高清图 PNG（Pro）</button>
+            <button id="exportSvg" data-icon="code" disabled>导出矢量 SVG（Pro）</button>
+            <button id="exportPdf" data-icon="pdf" disabled>导出分块打印 PDF（Pro·A4 分页）</button>
+            <button id="exportPack" data-icon="package" disabled>导出材料包清单（免费）</button>
+              <button id="exportBoards" data-icon="grid" disabled>导出分板裁切图（每板一页 PDF·Pro）</button>
             </div>
-            <button id="exportMenuBtn" class="export-fab" type="button"><span data-i18n="export.btn">导出</span> <span class="chev">▾</span></button>
+            <button id="exportMenuBtn" class="export-fab" type="button">导出 <span class="chev">▾</span></button>
 
             <div class="details">
-            <button class="details-toggle" type="button"><span data-i18n="details.title">图例 / 用料 / 设置</span> <span class="chev">▾</span></button>
+            <button class="details-toggle" type="button">图例 / 用料 / 设置 <span class="chev">▾</span></button>
             <div class="details-body">
               <div id="infoPanel" class="info-panel panel"></div>
           <label class="field check">
-            <input type="checkbox" id="pixelWhiteBg" /> <span data-i18n="details.whiteBg">逐格像素图：背景填白（默认透明，部分 App 把透明当地时用填白更稳）</span>
+            <input type="checkbox" id="pixelWhiteBg" /> 逐格像素图：背景填白（默认透明，部分 App 把透明当地时用填白更稳）
           </label>
-          <div class="watermark-settings">
-            <div class="wm-title muted small" data-i18n="details.watermark">水印设置（预览图）</div>
-            <label class="field">
-              <span data-i18n="details.watermark.text">水印文字</span>
-              <input type="text" id="watermarkText" class="field" value="拼豆图稿平台" maxlength="30" />
-            </label>
-            <label class="field">
-              <span data-i18n="details.watermark.opacity">透明度</span> <span id="wmOpacityVal" class="muted">10%</span>
-              <input type="range" id="watermarkOpacity" min="0" max="50" value="10" step="1" />
-            </label>
-            <label class="field">
-              <span data-i18n="details.watermark.angle">角度</span> <span id="wmAngleVal" class="muted">-30°</span>
-              <input type="range" id="watermarkAngle" min="-90" max="90" value="-30" step="5" />
-            </label>
-          </div>
-          <div class="actions-hint muted small" data-i18n="details.actionsHint">免费：预览图（带水印）+ 逐格像素图（用于豆画 / 颂拼豆）+ 材料包清单 · Pro：去水印高清 / 矢量 / 分块打印 PDF / 分板裁切图 · PDF 需联网加载库</div>
+          <div class="actions-hint muted small">免费：预览图（带水印）+ 逐格像素图（用于豆画 / 颂拼豆）+ 材料包清单 · Pro：去水印高清 / 矢量 / 分块打印 PDF / 分板裁切图 · PDF 需联网加载库</div>
               <div id="legend" class="legend panel"></div>
-              <div id="materialsPanel" class="materials-panel panel" hidden></div>
             </div><!-- /details-body -->
           </div><!-- /details -->
 
           <div class="edit-panel panel" id="editPanel" hidden>
-            <div class="edit-head"><span data-i18n="edit.title">手动编辑</span> <span class="muted" data-i18n="edit.subtitle">（专业拼豆绘图）</span></div>
+            <div class="edit-head">手动编辑 <span class="muted">（专业拼豆绘图）</span></div>
             <div class="edit-toolbar">
-              <button type="button" class="tool-btn active" data-tool="paint" data-icon="brush" title="画笔 (B)" data-i18n="edit.tools.paint">画笔</button>
-              <button type="button" class="tool-btn" data-tool="erase" data-icon="eraser" title="擦除 (E)" data-i18n="edit.tools.erase">擦除</button>
-              <button type="button" class="tool-btn" data-tool="pick" data-icon="eyedropper" title="取色 (I)" data-i18n="edit.tools.pick">取色</button>
-              <button type="button" class="tool-btn" data-tool="fill" data-icon="bucket" title="填充 (G)" data-i18n="edit.tools.fill">填充</button>
-              <button type="button" class="tool-btn" data-tool="line" data-icon="line" title="直线 (L)" data-i18n="edit.tools.line">直线</button>
-              <button type="button" class="tool-btn" data-tool="rect" data-icon="square" title="矩形 (R)" data-i18n="edit.tools.rect">矩形</button>
-              <button type="button" class="tool-btn" data-tool="ellipse" data-icon="circle" title="椭圆 (O)" data-i18n="edit.tools.ellipse">椭圆</button>
-              <button type="button" class="tool-btn" data-tool="select" data-icon="select" title="选择 (S)" data-i18n="edit.tools.select">选择</button>
-              <button type="button" class="tool-btn" data-tool="text" data-icon="text" title="文字 (T)" data-i18n="edit.tools.text">文字</button>
-              <button type="button" class="tool-btn" data-tool="view" data-icon="eye" title="查看 (V)" data-i18n="edit.tools.view">查看</button>
-              <button type="button" class="tool-btn" data-tool="replace" data-icon="swap" title="换色 (X)" data-i18n="edit.tools.replace">换色</button>
+              <button type="button" class="tool-btn active" data-tool="paint" data-icon="brush" title="画笔 (B)">画笔</button>
+              <button type="button" class="tool-btn" data-tool="erase" data-icon="eraser" title="擦除 (E)">擦除</button>
+              <button type="button" class="tool-btn" data-tool="pick" data-icon="eyedropper" title="取色 (I)">取色</button>
+              <button type="button" class="tool-btn" data-tool="fill" data-icon="bucket" title="填充 (G)">填充</button>
+              <button type="button" class="tool-btn" data-tool="line" data-icon="line" title="直线 (L)">直线</button>
+              <button type="button" class="tool-btn" data-tool="rect" data-icon="square" title="矩形 (R)">矩形</button>
+              <button type="button" class="tool-btn" data-tool="ellipse" data-icon="circle" title="椭圆 (O)">椭圆</button>
+              <button type="button" class="tool-btn" data-tool="select" data-icon="select" title="选择 (S)">选择</button>
+              <button type="button" class="tool-btn" data-tool="text" data-icon="text" title="文字 (T)">文字</button>
+              <button type="button" class="tool-btn" data-tool="view" data-icon="eye" title="查看 (V)">查看</button>
             </div>
             <div class="edit-tools-row">
               <div class="edit-current">
@@ -249,43 +195,43 @@
                 </div>
               </div>
               <div class="edit-undo">
-                <button id="undoBtn" data-icon="undo" title="撤销 Ctrl+Z" data-i18n="edit.undo">撤销</button>
-                <button id="redoBtn" data-icon="redo" title="重做 Ctrl+Y" data-i18n="edit.redo">重做</button>
+                <button id="undoBtn" data-icon="undo" title="撤销 Ctrl+Z">撤销</button>
+                <button id="redoBtn" data-icon="redo" title="重做 Ctrl+Y">重做</button>
               </div>
             </div>
             <div class="edit-row">
-              <label class="chk"><input type="checkbox" id="gridToggle" checked /> <span data-i18n="edit.grid">网格</span></label>
-              <label class="chk"><input type="checkbox" id="boardToggle" checked /> <span data-i18n="edit.board">板子分隔</span></label>
-              <label class="chk"><input type="checkbox" id="refOutline" /> <span data-i18n="edit.refOutline">参考描边</span></label>
-              <label class="chk"><input type="checkbox" id="highlightEdits" /> <span data-i18n="edit.highlight">高亮改动</span></label>
-              <label class="chk"><span data-i18n="edit.sym">对称</span>
+              <label class="chk"><input type="checkbox" id="gridToggle" checked /> 网格</label>
+              <label class="chk"><input type="checkbox" id="boardToggle" checked /> 板子分隔</label>
+              <label class="chk"><input type="checkbox" id="refOutline" /> 参考描边</label>
+              <label class="chk"><input type="checkbox" id="highlightEdits" /> 高亮改动</label>
+              <label class="chk">对称
                 <select id="symMode">
-                  <option value="none" data-i18n="edit.sym.none">无</option>
-                  <option value="h" data-i18n="edit.sym.h">水平</option>
-                  <option value="v" data-i18n="edit.sym.v">垂直</option>
-                  <option value="quad" data-i18n="edit.sym.quad">中心</option>
+                  <option value="none">无</option>
+                  <option value="h">水平</option>
+                  <option value="v">垂直</option>
+                  <option value="quad">中心</option>
                 </select>
               </label>
             </div>
             <div class="edit-row">
-              <button id="flipH" type="button" class="mini-btn" data-icon="flipH" title="水平翻转" data-i18n="edit.flipH">水平</button>
-              <button id="flipV" type="button" class="mini-btn" data-icon="flipV" title="垂直翻转" data-i18n="edit.flipV">垂直</button>
-              <button id="rot90" type="button" class="mini-btn" data-icon="rotate" title="顺时针旋转 90°" data-i18n="edit.rotate">旋转</button>
+              <button id="flipH" type="button" class="mini-btn" data-icon="flipH" title="水平翻转">水平</button>
+              <button id="flipV" type="button" class="mini-btn" data-icon="flipV" title="垂直翻转">垂直</button>
+              <button id="rot90" type="button" class="mini-btn" data-icon="rotate" title="顺时针旋转 90°">旋转</button>
             </div>
-            <input id="editPaletteSearch" class="field" placeholder="搜索色号/十六进制，如 A1 或 #fa" data-i18n-placeholder="edit.search" />
+            <input id="editPaletteSearch" class="field" placeholder="搜索色号/十六进制，如 A1 或 #fa" />
             <div id="editPalette" class="edit-palette"></div>
-            <div class="muted small" data-i18n="edit.bgHint">首格为「背景」豆（棋盘格），按 <b>X</b> 快速选中并切到画笔。</div>
+            <div class="muted small">首格为「背景」豆（棋盘格），按 <b>X</b> 快速选中并切到画笔。</div>
             <div class="edit-row sel-row">
-              <span class="muted small" data-i18n="edit.selection">选区：</span>
-              <button id="selFill" type="button" class="mini-btn" data-icon="bucket" data-i18n="edit.selFill">填充</button>
-              <button id="selDel" type="button" class="mini-btn" data-icon="trash" data-i18n="edit.selDel">删除</button>
-              <button id="selCopy" type="button" class="mini-btn" data-icon="copy" data-i18n="edit.selCopy">复制</button>
-              <button id="selPaste" type="button" class="mini-btn" data-icon="paste" data-i18n="edit.selPaste">粘贴</button>
-              <button id="selClear" type="button" class="mini-btn" data-i18n="edit.selClear">取消</button>
+              <span class="muted small">选区：</span>
+              <button id="selFill" type="button" class="mini-btn" data-icon="bucket">填充</button>
+              <button id="selDel" type="button" class="mini-btn" data-icon="trash">删除</button>
+              <button id="selCopy" type="button" class="mini-btn" data-icon="copy">复制</button>
+              <button id="selPaste" type="button" class="mini-btn" data-icon="paste">粘贴</button>
+              <button id="selClear" type="button" class="mini-btn">取消</button>
             </div>
-            <button id="bulkBtn" type="button" class="ghost-btn" data-icon="magic" data-i18n="edit.bulk">批量改色…</button>
+            <button id="bulkBtn" type="button" class="ghost-btn" data-icon="magic">批量改色…</button>
             <div id="boardInfo" class="muted small"></div>
-            <p class="muted small" data-i18n="edit.help">画笔/擦除可拖拽连续 · 用「擦除」工具或右键擦除 · 直线/矩形/椭圆拖拽成形 · 选择后可拖动/复制/删除 · 取色后自动切画笔 · 点图例批量改色 · Delete 删选区 · Esc 取消。</p>
+            <p class="muted small">画笔/擦除可拖拽连续 · 用「擦除」工具或右键擦除 · 直线/矩形/椭圆拖拽成形 · 选择后可拖动/复制/删除 · 取色后自动切画笔 · 点图例批量改色 · Delete 删选区 · Esc 取消。</p>
           </div>
         </aside>
       </div>
@@ -294,61 +240,61 @@
     <section class="tabpanel" data-tab="ai" hidden>
       <div class="ai-panel">
         <label class="field" style="width:100%">
-          <span data-i18n="ai.prompt">描述你想生成的图案</span>
-          <textarea id="aiPrompt" rows="3" placeholder="例如：一只橘猫，扁平插画风，高对比" data-i18n-placeholder="ai.prompt.placeholder"></textarea>
+          描述你想生成的图案
+          <textarea id="aiPrompt" rows="3" placeholder="例如：一只橘猫，扁平插画风，高对比"></textarea>
           <div class="prompt-templates">
-            <span class="plabel" data-i18n="ai.templates">点选插入：</span>
-            <button type="button" class="prompt-tpl" data-ins="flat vector illustration, bold outline" data-i18n="ai.tpl.flat">扁平插画</button>
-            <button type="button" class="prompt-tpl" data-ins="pixel art, 8bit game sprite" data-i18n="ai.tpl.pixel">像素风</button>
-            <button type="button" class="prompt-tpl" data-ins="studio ghibli style" data-i18n="ai.tpl.ghibli">吉卜力</button>
-            <button type="button" class="prompt-tpl" data-ins="kawaii sticker, white outline" data-i18n="ai.tpl.kawaii">可爱贴纸</button>
-            <button type="button" class="prompt-tpl" data-ins="minimalist line art" data-i18n="ai.tpl.minimal">极简线条</button>
-            <button type="button" class="prompt-tpl" data-ins="watercolor painting, soft colors" data-i18n="ai.tpl.watercolor">水彩</button>
-            <button type="button" class="prompt-tpl" data-ins="highly detailed, intricate" data-i18n="ai.tpl.detail">高细节</button>
-            <button type="button" class="prompt-tpl" data-ins="vibrant colors, high contrast" data-i18n="ai.tpl.vibrant">鲜艳配色</button>
-            <button type="button" class="prompt-tpl" data-ins="clean solid background" data-i18n="ai.tpl.clean">干净背景</button>
-            <button type="button" class="prompt-tpl" data-ins="4k, masterpiece, best quality" data-i18n="ai.tpl.master">4K 杰作</button>
+            <span class="plabel">点选插入：</span>
+            <button type="button" class="prompt-tpl" data-ins="flat vector illustration, bold outline">扁平插画</button>
+            <button type="button" class="prompt-tpl" data-ins="pixel art, 8bit game sprite">像素风</button>
+            <button type="button" class="prompt-tpl" data-ins="studio ghibli style">吉卜力</button>
+            <button type="button" class="prompt-tpl" data-ins="kawaii sticker, white outline">可爱贴纸</button>
+            <button type="button" class="prompt-tpl" data-ins="minimalist line art">极简线条</button>
+            <button type="button" class="prompt-tpl" data-ins="watercolor painting, soft colors">水彩</button>
+            <button type="button" class="prompt-tpl" data-ins="highly detailed, intricate">高细节</button>
+            <button type="button" class="prompt-tpl" data-ins="vibrant colors, high contrast">鲜艳配色</button>
+            <button type="button" class="prompt-tpl" data-ins="clean solid background">干净背景</button>
+            <button type="button" class="prompt-tpl" data-ins="4k, masterpiece, best quality">4K 杰作</button>
           </div>
         </label>
         <label class="field">
-          <span data-i18n="ai.style">风格</span>
+          风格
           <select id="aiStyle">
-            <option value="" data-i18n="ai.style.default">默认</option>
-            <option value="flat vector, bold colors" data-i18n="ai.style.flat">扁平矢量</option>
-            <option value="pixel art" data-i18n="ai.style.pixel">像素风</option>
-            <option value="kawaii sticker" data-i18n="ai.style.kawaii">可爱贴纸</option>
-            <option value="minimalist line art" data-i18n="ai.style.minimal">极简线条</option>
+            <option value="">默认</option>
+            <option value="flat vector, bold colors">扁平矢量</option>
+            <option value="pixel art">像素风</option>
+            <option value="kawaii sticker">可爱贴纸</option>
+            <option value="minimalist line art">极简线条</option>
           </select>
         </label>
         <label class="field">
-          <span data-i18n="ai.provider">调用方式</span>
+          调用方式
           <select id="aiProvider">
-            <option value="comfy" selected data-i18n="ai.provider.comfy">本地 ComfyUI（127.0.0.1:8188）</option>
-            <option value="sd" data-i18n="ai.provider.sd">本地 A1111（127.0.0.1:7860）</option>
-            <option value="cogview" data-i18n="ai.provider.cogview">云端 智谱 CogView</option>
-            <option value="wanx" data-i18n="ai.provider.wanx">云端 通义万相</option>
-            <option value="mock" data-i18n="ai.provider.mock">Mock 占位（无需 key）</option>
+            <option value="comfy" selected>本地 ComfyUI（127.0.0.1:8188）</option>
+            <option value="sd">本地 A1111（127.0.0.1:7860）</option>
+            <option value="cogview">云端 智谱 CogView</option>
+            <option value="wanx">云端 通义万相</option>
+            <option value="mock">Mock 占位（无需 key）</option>
           </select>
         </label>
         <div class="ai-presets">
-          <span class="plabel" data-i18n="ai.presets">预设：</span>
-          <button type="button" class="ai-preset" data-preset="anime" data-i18n="ai.preset.anime">动漫</button>
-          <button type="button" class="ai-preset" data-preset="illustration" data-i18n="ai.preset.illustration">插画</button>
-          <button type="button" class="ai-preset" data-preset="pixel" data-i18n="ai.preset.pixel">像素</button>
-          <button type="button" class="ai-preset" data-preset="realistic" data-i18n="ai.preset.realistic">写实</button>
+          <span class="plabel">预设：</span>
+          <button type="button" class="ai-preset" data-preset="anime">动漫</button>
+          <button type="button" class="ai-preset" data-preset="illustration">插画</button>
+          <button type="button" class="ai-preset" data-preset="pixel">像素</button>
+          <button type="button" class="ai-preset" data-preset="realistic">写实</button>
         </div>
         <label class="field" style="min-width:220px">
-          <span data-i18n="ai.model">模型（ComfyUI）</span>
-          <select id="aiModel"><option value="" data-i18n="ai.model.auto">（自动选第一个）</option></select>
+          模型（ComfyUI）
+          <select id="aiModel"><option value="">（自动选第一个）</option></select>
         </label>
         <label class="field" style="width:100%">
-          <span data-i18n="ai.negative">负向提示词</span>
+          负向提示词
           <input id="aiNegative" placeholder="low quality, blurry, extra digits, deformed" />
         </label>
         <div class="ai-params">
-          <label class="field"><span data-i18n="ai.steps">步数</span><input id="aiSteps" type="number" value="28" min="1" max="150" style="width:64px" /></label>
-          <label class="field"><span data-i18n="ai.cfg">CFG</span><input id="aiCfg" type="number" value="7" step="0.5" min="1" max="30" style="width:64px" /></label>
-          <label class="field"><span data-i18n="ai.sampler">采样器</span>
+          <label class="field">步数<input id="aiSteps" type="number" value="28" min="1" max="150" style="width:64px" /></label>
+          <label class="field">CFG<input id="aiCfg" type="number" value="7" step="0.5" min="1" max="30" style="width:64px" /></label>
+          <label class="field">采样器
             <select id="aiSampler">
               <option value="dpmpp_2m" selected>dpmpp_2m</option>
               <option value="dpmpp_2m_sde">dpmpp_2m_sde</option>
@@ -359,7 +305,7 @@
               <option value="uni_pc">uni_pc</option>
             </select>
           </label>
-          <label class="field"><span data-i18n="ai.scheduler">调度</span>
+          <label class="field">调度
             <select id="aiScheduler">
               <option value="karras" selected>karras</option>
               <option value="normal">normal</option>
@@ -367,7 +313,7 @@
               <option value="simple">simple</option>
             </select>
           </label>
-          <label class="field"><span data-i18n="ai.size">尺寸</span>
+          <label class="field">尺寸
             <select id="aiSize">
               <option value="512" selected>512</option>
               <option value="640">640</option>
@@ -376,20 +322,20 @@
             </select>
           </label>
         </div>
-        <button id="aiGen" data-i18n="ai.generate">生成图片</button>
-        <div id="aiStatus" class="hint" data-i18n="ai.status">当前提供方：<span id="aiProviderLabel">…</span></div>
+        <button id="aiGen">生成图片</button>
+        <div id="aiStatus" class="hint">当前提供方：<span id="aiProviderLabel">…</span></div>
         <div class="ai-result">
           <img id="aiImg" alt="AI 生成结果" hidden />
-          <button id="aiToPattern" class="primary" hidden data-i18n="ai.convert">转为拼豆图稿 →</button>
+          <button id="aiToPattern" class="primary" hidden>转为拼豆图稿 →</button>
         </div>
-        <p class="muted" data-i18n="ai.note">mock 为本地占位图（无需 key 即可跑通流程）；在 <code>config.js</code> 填入 key 并切换 provider 即接入真实国产免费 API（智谱 CogView / 通义万相）。key 仅存于后端，不进前端。</p>
+        <p class="muted">mock 为本地占位图（无需 key 即可跑通流程）；在 <code>config.js</code> 填入 key 并切换 provider 即接入真实国产免费 API（智谱 CogView / 通义万相）。key 仅存于后端，不进前端。</p>
       </div>
     </section>
 
     <section class="tabpanel" data-tab="swatch" hidden>
       <div class="swatch-tools">
         <label class="field">
-          <span data-i18n="swatch.size">色板大小</span>
+          色板大小
           <select id="swatchSize">
             <option value="24">24 色</option>
             <option value="80">80 色</option>
@@ -398,62 +344,53 @@
             <option value="291" selected>291（全部）</option>
           </select>
         </label>
-        <input id="swatchSearch" class="field" placeholder="搜索色号 / 十六进制，如 A1 或 #fa" data-i18n-placeholder="swatch.search" />
+        <input id="swatchSearch" class="field" placeholder="搜索色号 / 十六进制，如 A1 或 #fa" />
         <span id="swatchCount" class="hint"></span>
       </div>
       <div id="swatchGrid" class="swatch-grid"></div>
-      <p class="muted" data-i18n="swatch.note">HEX 为屏幕参考值，非实物色值；请与官方色卡实物对照确认。</p>
+      <p class="muted">HEX 为屏幕参考值，非实物色值；请与官方色卡实物对照确认。</p>
     </section>
   </main>
 
   <script src="js/mard-colors.js"></script>
   <script src="js/palette.js"></script>
-  <script src="js/library-db.js"></script>
-  <script src="js/tutorial.js"></script>
-  <script src="js/features.js"></script>
-  <script src="js/versions.js"></script>
-  <script src="js/shortcuts.js"></script>
-  <script src="js/error-boundary.js"></script>
-  <script src="js/ipad-fixes.js"></script>
-  <script src="js/tests.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
 
   <div id="paywall" class="modal">
     <div class="modal-box">
-      <h3 data-i18n="paywall.title">升级 Pro</h3>
+      <h3>升级 Pro</h3>
       <p id="paywallReason"></p>
-      <p class="muted" data-i18n="paywall.note">免费即可用：<b>预览图（带水印）</b>与<b>材料包清单</b>。<br>Pro 解锁：<b>去水印完整高清 PNG</b>、<b>矢量 SVG</b>、<b>A4 分页打印 PDF</b>、<b>分板裁切图（每板一页）</b>。<br>当前为演示环境，接入支付（微信/支付宝/Stripe）后此处即正式解锁。</p>
+      <p class="muted">免费即可用：<b>预览图（带水印）</b>与<b>材料包清单</b>。<br>Pro 解锁：<b>去水印完整高清 PNG</b>、<b>矢量 SVG</b>、<b>A4 分页打印 PDF</b>、<b>分板裁切图（每板一页）</b>。<br>当前为演示环境，接入支付（微信/支付宝/Stripe）后此处即正式解锁。</p>
       <div class="modal-actions">
-        <button id="paywallClose" data-i18n="paywall.cancel">稍后</button>
-        <button id="unlockPro" class="primary" data-i18n="paywall.unlock">模拟解锁（演示）</button>
+        <button id="paywallClose">稍后</button>
+        <button id="unlockPro" class="primary">模拟解锁（演示）</button>
       </div>
     </div>
   </div>
 
   <div id="bulkModal" class="modal">
     <div class="modal-box">
-      <h3 data-i18n="bulk.title">批量改色</h3>
-      <label class="field"><span data-i18n="bulk.from">从</span>
+      <h3>批量改色</h3>
+      <label class="field">从
         <select id="bulkFrom"></select>
       </label>
-      <label class="field"><span data-i18n="bulk.to">到</span>
+      <label class="field">到
         <select id="bulkTo"></select>
       </label>
       <div id="bulkPreview" class="muted"></div>
       <div class="modal-actions">
-        <button id="bulkClose" data-i18n="bulk.cancel">取消</button>
-        <button id="bulkApplyBtn" class="primary" data-i18n="bulk.apply">应用</button>
+        <button id="bulkClose">取消</button>
+        <button id="bulkApplyBtn" class="primary">应用</button>
       </div>
     </div>
   </div>
 
   <div id="textPopover" class="text-popover" hidden>
-    <div class="tp-title" data-i18n="text.title">输入文字（将按当前颜色填入珠子）</div>
-    <input id="textInput" class="field" placeholder="如 ABC / 你好" maxlength="40" data-i18n-placeholder="text.placeholder" />
+    <div class="tp-title">输入文字（将按当前颜色填入珠子）</div>
+    <input id="textInput" class="field" placeholder="如 ABC / 你好" maxlength="40" />
     <label class="field" style="display:flex;align-items:center;gap:6px">
-      <span data-i18n="text.height">字高（珠）</span>
+      字高（珠）
       <select id="textSize">
         <option value="5">5</option>
         <option value="7" selected>7</option>
@@ -463,24 +400,24 @@
       </select>
     </label>
     <div class="tp-actions">
-      <button id="textCancel" type="button" data-i18n="text.cancel">取消</button>
-      <button id="textOk" type="button" class="primary" data-i18n="text.ok">填入</button>
+      <button id="textCancel" type="button">取消</button>
+      <button id="textOk" type="button" class="primary">填入</button>
     </div>
   </div>
 
   <div id="libraryModal" class="modal">
     <div class="modal-box lib-modal">
       <div class="lib-head">
-        <h3 data-i18n="lib.title">我的图纸库</h3>
+        <h3>我的图纸库</h3>
         <button id="libraryClose" type="button" class="lib-x" aria-label="关闭">✕</button>
       </div>
       <div class="lib-save">
-        <input id="libName" class="field" placeholder="图纸名称（如：橘猫头像·58格）" data-i18n-placeholder="lib.name.placeholder" />
-        <input id="libTags" class="field" placeholder="标签，用空格或逗号分隔（如：动物 礼物）" data-i18n-placeholder="lib.tags.placeholder" />
-        <button id="libSave" class="primary" data-icon="download" data-i18n="lib.save">保存到图纸库</button>
+        <input id="libName" class="field" placeholder="图纸名称（如：橘猫头像·58格）" />
+        <input id="libTags" class="field" placeholder="标签，用空格或逗号分隔（如：动物 礼物）" />
+        <button id="libSave" class="primary" data-icon="download">保存到图纸库</button>
       </div>
       <div id="libraryGrid" class="lib-grid"></div>
-      <p class="muted small" data-i18n="lib.note">图纸自动保存到本机（离线可用）和服务器，双重保险。</p>
+      <p class="muted small">图纸保存在本机服务器 <code>library/</code> 文件夹（每份一个 json + 缩略图），可直接备份或分享；云端同步之后再说。</p>
     </div>
   </div>
   <script>
