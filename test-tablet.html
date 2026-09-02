@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>iPad 体验验证 — 拼豆图稿</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui; background: #f0f2f5; }
+    .test-info {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: rgba(0,0,0,0.85); color: #fff; padding: 8px 16px;
+      font-size: 12px; display: flex; justify-content: space-between;
+      font-family: monospace;
+    }
+    .test-info .device { color: #4fc3f7; }
+    .test-info .layout { color: #81c784; }
+    iframe {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      width: 100%; height: 100%; border: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-info">
+    <span class="device" id="deviceInfo">检测中...</span>
+    <span class="layout" id="layoutInfo">检测中...</span>
+  </div>
+  <iframe src="index.html" id="appFrame"></iframe>
+  <script>
+    function detect() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const ratio = window.devicePixelRatio || 1;
+      const coarse = window.matchMedia("(pointer: coarse)").matches;
+      const orient = w > h ? "横屏" : "竖屏";
+      let device = "未知";
+      if (w >= 1024 && w <= 1366) device = "iPad 12.9\"";
+      else if (w >= 834 && w <= 1194) device = "iPad 11\"";
+      else if (w >= 810 && w <= 1080) device = "iPad 10.2\"";
+      else if (w >= 768 && w <= 1024) device = "iPad 9.7\"";
+      else if (w < 481) device = "手机";
+      else if (w > 1366) device = "桌面";
+      const tablet = coarse && w >= 481;
+      document.getElementById("deviceInfo").textContent =
+        `${device} | ${w}×${h} | dpr=${ratio} | ${orient} | 触控=${coarse ? "是" : "否"}`;
+      document.getElementById("layoutInfo").textContent =
+        tablet ? "✅ Procreate 布局已激活" : "⚠️ 桌面/手机布局";
+    }
+    detect();
+    window.addEventListener("resize", detect);
+  </script>
+</body>
+</html>

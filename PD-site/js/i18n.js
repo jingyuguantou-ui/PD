@@ -1,0 +1,481 @@
+const I18N = (() => {
+  const STORAGE_KEY = "pindou-lang";
+  let currentLang = "zh";
+  const translations = {
+    zh: {
+      // brand
+      "brand.title": "鲸鱼罐头 · 拼豆图稿",
+      "brand.sub": "图片转图稿 · AI 生图 · 色卡校验",
+      // header
+      "header.library": "图纸库",
+      "header.history": "最近",
+      // tabs
+      "tab.convert": "图片转图稿",
+      "tab.ai": "AI 生图",
+      "tab.swatch": "色卡校验",
+      // controls
+      "ctrl.settings": "图片与配色设置",
+      "ctrl.image": "图片",
+      "ctrl.batch": "批量转换",
+      "ctrl.sample": "示例图",
+      "ctrl.palette": "珠色品牌",
+      "ctrl.paletteSize": "色板大小",
+      "ctrl.cols": "横向珠数",
+      "ctrl.colsHint": "29≈1块标准板(约14cm)，58≈4块。",
+      "ctrl.edit": "编辑",
+      "ctrl.generate": "生成图稿",
+      "ctrl.new": "新建",
+      "ctrl.hint.upload": "请先上传图片",
+      // advanced
+      "adv.title": "更多设置",
+      "adv.colorMode": "配色模式",
+      "adv.colorMode.brand": "品牌珠色",
+      "adv.colorMode.original": "保留原色",
+      "adv.colorMode.hint": "品牌珠色=用官方色号（可买）；保留原色=显示接近的实色（无编号）。",
+      "adv.maxColors": "目标颜色数",
+      "adv.maxColors.none": "不限制（原样）",
+      "adv.maxColors.hint": "将识别出的颜色聚合为指定数量（类似 PS 减少颜色），不影响尺寸与板子。",
+      "adv.removeBg": "去背景（不计入珠数）",
+      "adv.bgTol": "背景容差",
+      "adv.bgTol.hint": "容差越小只去掉最像边缘色的区域。",
+      "adv.edgeAware": "边缘感知去背景（保留人物描边）",
+      "adv.outlineMode": "线稿描边（轮廓统一深色珠）",
+      "adv.mode": "图纸模式（带符号/坐标）",
+      "adv.ghost": "对比原图（半透明叠加）",
+      "adv.board": "板子方向（分块打印）",
+      "adv.board.square": "正方 29×29",
+      "adv.board.h": "横向 58×29",
+      "adv.board.v": "竖向 29×58",
+      "adv.board.big": "大方板 58×58",
+      "adv.board.hint": "仅影响分块打印/裁切的每页板型，不改变画布内容。",
+      "adv.calc": "计算",
+      // viewbar
+      "view.preview": "预览：",
+      "view.fit": "适应宽度",
+      "view.actual": "实际大小",
+      "view.snapshot": "快照",
+      "view.compareSnapshot": "对比快照",
+      "view.hint": "可拖拽/触摸平移 · 滚轮/双指缩放",
+      // empty hint
+      "empty.upload": "上传一张图片开始",
+      "empty.sub": "支持 JPG / PNG / GIF / WebP\n也可以点「示例图片」试试看",
+      // export
+      "export.save": "保存图纸",
+      "export.preview": "导出预览图 PNG（免费·带水印）",
+      "export.pixel": "导出逐格像素图 PNG（免费·用于豆画 / 颂拼豆）",
+      "export.full": "导出完整高清图 PNG（Pro）",
+      "export.svg": "导出矢量 SVG（Pro）",
+      "export.pdf": "导出分块打印 PDF（Pro·A4 分页）",
+      "export.pack": "导出材料包清单（免费）",
+      "export.boards": "导出分板裁切图（每板一页 PDF·Pro）",
+      "export.more": "更多格式：",
+      "export.jpg": "导出 JPG",
+      "export.bmp": "导出 BMP",
+      "export.compare": "原图 vs 图稿对比",
+      "export.pro": "升级 Pro / 解锁全部功能",
+      "export.share": "生成分享链接",
+      "export.btn": "导出",
+      // details
+      "details.title": "图例 / 用料 / 设置",
+      "details.whiteBg": "逐格像素图：背景填白（默认透明，部分 App 把透明当地时用填白更稳）",
+      "details.watermark": "水印设置（预览图）",
+      "details.watermark.text": "水印文字",
+      "details.watermark.opacity": "透明度",
+      "details.watermark.angle": "角度",
+      "details.actionsHint": "免费：预览图（带水印）+ 逐格像素图（用于豆画 / 颂拼豆）+ 材料包清单 · Pro：去水印高清 / 矢量 / 分块打印 PDF / 分板裁切图 · PDF 需联网加载库",
+      // edit panel
+      "edit.title": "手动编辑",
+      "edit.subtitle": "（专业拼豆绘图）",
+      "edit.tools.paint": "画笔",
+      "edit.tools.erase": "擦除",
+      "edit.tools.pick": "取色",
+      "edit.tools.fill": "填充",
+      "edit.tools.line": "直线",
+      "edit.tools.rect": "矩形",
+      "edit.tools.ellipse": "椭圆",
+      "edit.tools.select": "选择",
+      "edit.tools.text": "文字",
+      "edit.tools.view": "查看",
+      "edit.tools.replace": "换色",
+      "edit.colorName": "—",
+      "edit.colorCode": "请选色",
+      "edit.undo": "撤销",
+      "edit.redo": "重做",
+      "edit.grid": "网格",
+      "edit.board": "板子分隔",
+      "edit.refOutline": "参考描边",
+      "edit.highlight": "高亮改动",
+      "edit.sym": "对称",
+      "edit.sym.none": "无",
+      "edit.sym.h": "水平",
+      "edit.sym.v": "垂直",
+      "edit.sym.quad": "中心",
+      "edit.flipH": "水平",
+      "edit.flipV": "垂直",
+      "edit.rotate": "旋转",
+      "edit.search": "搜索色号/十六进制，如 A1 或 #fa",
+      "edit.bgHint": "首格为「背景」豆（棋盘格），按 X 快速选中并切到画笔。",
+      "edit.selection": "选区：",
+      "edit.selFill": "填充",
+      "edit.selDel": "删除",
+      "edit.selCopy": "复制",
+      "edit.selPaste": "粘贴",
+      "edit.selClear": "取消",
+      "edit.bulk": "批量改色…",
+      "edit.help": "画笔/擦除可拖拽连续 · 用「擦除」工具或右键擦除 · 直线/矩形/椭圆拖拽成形 · 选择后可拖动/复制/删除 · 取色后自动切画笔 · 点图例批量改色 · Delete 删选区 · Esc 取消。",
+      // AI panel
+      "ai.prompt": "描述你想生成的图案",
+      "ai.prompt.placeholder": "例如：一只橘猫，扁平插画风，高对比",
+      "ai.templates": "点选插入：",
+      "ai.tpl.flat": "扁平插画",
+      "ai.tpl.pixel": "像素风",
+      "ai.tpl.ghibli": "吉卜力",
+      "ai.tpl.kawaii": "可爱贴纸",
+      "ai.tpl.minimal": "极简线条",
+      "ai.tpl.watercolor": "水彩",
+      "ai.tpl.detail": "高细节",
+      "ai.tpl.vibrant": "鲜艳配色",
+      "ai.tpl.clean": "干净背景",
+      "ai.tpl.master": "4K 杰作",
+      "ai.style": "风格",
+      "ai.style.default": "默认",
+      "ai.style.flat": "扁平矢量",
+      "ai.style.pixel": "像素风",
+      "ai.style.kawaii": "可爱贴纸",
+      "ai.style.minimal": "极简线条",
+      "ai.provider": "调用方式",
+      "ai.provider.comfy": "本地 ComfyUI（127.0.0.1:8188）",
+      "ai.provider.sd": "本地 A1111（127.0.0.1:7860）",
+      "ai.provider.cogview": "云端 智谱 CogView",
+      "ai.provider.wanx": "云端 通义万相",
+      "ai.provider.mock": "Mock 占位（无需 key）",
+      "ai.presets": "预设：",
+      "ai.preset.anime": "动漫",
+      "ai.preset.illustration": "插画",
+      "ai.preset.pixel": "像素",
+      "ai.preset.realistic": "写实",
+      "ai.model": "模型（ComfyUI）",
+      "ai.model.auto": "（自动选第一个）",
+      "ai.negative": "负向提示词",
+      "ai.steps": "步数",
+      "ai.cfg": "CFG",
+      "ai.sampler": "采样器",
+      "ai.scheduler": "调度",
+      "ai.size": "尺寸",
+      "ai.generate": "生成图片",
+      "ai.status": "当前提供方：",
+      "ai.convert": "转为拼豆图稿 →",
+      "ai.note": "mock 为本地占位图（无需 key 即可跑通流程）；在 config.js 填入 key 并切换 provider 即接入真实国产免费 API（智谱 CogView / 通义万相）。key 仅存于后端，不进前端。",
+      // swatch
+      "swatch.size": "色板大小",
+      "swatch.search": "搜索色号 / 十六进制，如 A1 或 #fa",
+      "swatch.note": "HEX 为屏幕参考值，非实物色值；请与官方色卡实物对照确认。",
+      // paywall
+      "paywall.title": "升级 Pro",
+      "paywall.note": "免费即可用：预览图（带水印）与材料包清单。Pro 解锁：去水印完整高清 PNG、矢量 SVG、A4 分页打印 PDF、分板裁切图（每板一页）。当前为演示环境，接入支付（微信/支付宝/Stripe）后此处即正式解锁。",
+      "paywall.cancel": "稍后",
+      "paywall.unlock": "模拟解锁（演示）",
+      // bulk modal
+      "bulk.title": "批量改色",
+      "bulk.from": "从",
+      "bulk.to": "到",
+      "bulk.cancel": "取消",
+      "bulk.apply": "应用",
+      // text popover
+      "text.title": "输入文字（将按当前颜色填入珠子）",
+      "text.placeholder": "如 ABC / 你好",
+      "text.height": "字高（珠）",
+      "text.cancel": "取消",
+      "text.ok": "填入",
+      // library
+      "lib.title": "我的图纸库",
+      "lib.name.placeholder": "图纸名称（如：橘猫头像·58格）",
+      "lib.tags.placeholder": "标签，用空格或逗号分隔（如：动物 礼物）",
+      "lib.save": "保存到图纸库",
+      "lib.note": "图纸自动保存到本机（离线可用）和服务器，双重保险。",
+      // history
+      "hist.title": "自动存档",
+      "hist.subtitle": "每 5 分钟自动保存，最多 10 条，点击恢复",
+      "hist.empty": "暂无存档，生成图稿后开始自动保存",
+      "hist.restore": "恢复到此存档？当前未保存的修改将丢失",
+      // shortcuts
+      "sc.title": "键盘快捷键",
+      "sc.global": "全局",
+      "sc.editable": "编辑模式（可自定义）",
+      "sc.canvas": "画布",
+      "sc.reset": "恢复默认",
+      "sc.close": "关闭",
+      // tutorial
+      "tut.title": "快速上手",
+      "tut.skip": "跳过",
+      "tut.next": "下一步",
+      "tut.finish": "开始使用",
+      // dark mode
+      "dark.tip": "深色/浅色模式",
+      // versions
+      "ver.title": "版本历史",
+      "ver.empty": "暂无版本记录",
+      // calc
+      "calc.title": "拼豆尺寸计算器",
+    },
+    en: {
+      // brand
+      "brand.title": "Whale Can · Perler Pattern",
+      "brand.sub": "Image to Pattern · AI Art · Color Check",
+      // header
+      "header.library": "Library",
+      "header.history": "Recent",
+      // tabs
+      "tab.convert": "Image to Pattern",
+      "tab.ai": "AI Generate",
+      "tab.swatch": "Color Check",
+      // controls
+      "ctrl.settings": "Image & Color Settings",
+      "ctrl.image": "Image",
+      "ctrl.batch": "Batch Convert",
+      "ctrl.sample": "Sample",
+      "ctrl.palette": "Bead Brand",
+      "ctrl.paletteSize": "Palette Size",
+      "ctrl.cols": "Columns",
+      "ctrl.colsHint": "29≈1 standard board (~14cm), 58≈4.",
+      "ctrl.edit": "Edit",
+      "ctrl.generate": "Generate",
+      "ctrl.new": "New",
+      "ctrl.hint.upload": "Upload an image first",
+      // advanced
+      "adv.title": "More Settings",
+      "adv.colorMode": "Color Mode",
+      "adv.colorMode.brand": "Brand Beads",
+      "adv.colorMode.original": "Original Colors",
+      "adv.colorMode.hint": "Brand=use official color codes (purchasable); Original=display closest solid color (no code).",
+      "adv.maxColors": "Max Colors",
+      "adv.maxColors.none": "No limit",
+      "adv.maxColors.hint": "Aggregate detected colors to specified count (like PS reduce colors).",
+      "adv.removeBg": "Remove Background (not counted)",
+      "adv.bgTol": "BG Tolerance",
+      "adv.bgTol.hint": "Lower tolerance removes only areas close to edge color.",
+      "adv.edgeAware": "Edge-aware BG removal (keep outlines)",
+      "adv.outlineMode": "Outline mode (uniform dark beads)",
+      "adv.mode": "Pattern mode (symbols/coordinates)",
+      "adv.ghost": "Compare original (overlay)",
+      "adv.board": "Board orientation (split print)",
+      "adv.board.square": "Square 29×29",
+      "adv.board.h": "Horizontal 58×29",
+      "adv.board.v": "Vertical 29×58",
+      "adv.board.big": "Large 58×58",
+      "adv.board.hint": "Only affects split print layout, not canvas content.",
+      "adv.calc": "Calc",
+      // viewbar
+      "view.preview": "Preview:",
+      "view.fit": "Fit Width",
+      "view.actual": "Actual Size",
+      "view.snapshot": "Snapshot",
+      "view.compareSnapshot": "Compare",
+      "view.hint": "Drag/pinch to pan · Scroll/pinch to zoom",
+      // empty hint
+      "empty.upload": "Upload an image to start",
+      "empty.sub": "Supports JPG / PNG / GIF / WebP\nOr try the sample image",
+      // export
+      "export.save": "Save Pattern",
+      "export.preview": "Export Preview PNG (free·watermarked)",
+      "export.pixel": "Export Pixel Grid PNG (free)",
+      "export.full": "Export Full HD PNG (Pro)",
+      "export.svg": "Export Vector SVG (Pro)",
+      "export.pdf": "Export Split Print PDF (Pro·A4)",
+      "export.pack": "Export Material List (free)",
+      "export.boards": "Export Board Cut Pages (Pro)",
+      "export.more": "More formats:",
+      "export.jpg": "Export JPG",
+      "export.bmp": "Export BMP",
+      "export.compare": "Original vs Pattern",
+      "export.pro": "Upgrade Pro / Unlock All",
+      "export.share": "Share Link",
+      "export.btn": "Export",
+      // details
+      "details.title": "Legend / Materials / Settings",
+      "details.whiteBg": "Pixel Grid: white background (default transparent)",
+      "details.watermark": "Watermark Settings (preview)",
+      "details.watermark.text": "Watermark Text",
+      "details.watermark.opacity": "Opacity",
+      "details.watermark.angle": "Angle",
+      "details.actionsHint": "Free: preview (watermarked) + pixel grid + material list · Pro: HD/no watermark + SVG + PDF + board cuts",
+      // edit panel
+      "edit.title": "Manual Edit",
+      "edit.subtitle": "(Pro Perler Drawing)",
+      "edit.tools.paint": "Brush",
+      "edit.tools.erase": "Eraser",
+      "edit.tools.pick": "Pick",
+      "edit.tools.fill": "Fill",
+      "edit.tools.line": "Line",
+      "edit.tools.rect": "Rect",
+      "edit.tools.ellipse": "Ellipse",
+      "edit.tools.select": "Select",
+      "edit.tools.text": "Text",
+      "edit.tools.view": "View",
+      "edit.tools.replace": "Replace",
+      "edit.colorName": "—",
+      "edit.colorCode": "Pick a color",
+      "edit.undo": "Undo",
+      "edit.redo": "Redo",
+      "edit.grid": "Grid",
+      "edit.board": "Board Lines",
+      "edit.refOutline": "Ref Outline",
+      "edit.highlight": "Highlight Edits",
+      "edit.sym": "Symmetry",
+      "edit.sym.none": "Off",
+      "edit.sym.h": "Horizontal",
+      "edit.sym.v": "Vertical",
+      "edit.sym.quad": "Center",
+      "edit.flipH": "Flip H",
+      "edit.flipV": "Flip V",
+      "edit.rotate": "Rotate",
+      "edit.search": "Search color/hex, e.g. A1 or #fa",
+      "edit.bgHint": "First cell is BG (checkerboard). Press X to select it.",
+      "edit.selection": "Selection:",
+      "edit.selFill": "Fill",
+      "edit.selDel": "Delete",
+      "edit.selCopy": "Copy",
+      "edit.selPaste": "Paste",
+      "edit.selClear": "Cancel",
+      "edit.bulk": "Bulk Recolor…",
+      "edit.help": "Brush/eraser drag continuously · Right-click to erase · Line/rect/ellipse drag to shape · Select then drag/copy/delete · Pick auto-switches to brush · Click legend to recolor · Delete to remove selection · Esc to cancel.",
+      // AI panel
+      "ai.prompt": "Describe the pattern you want",
+      "ai.prompt.placeholder": "e.g. an orange cat, flat illustration, high contrast",
+      "ai.templates": "Insert template:",
+      "ai.tpl.flat": "Flat",
+      "ai.tpl.pixel": "Pixel",
+      "ai.tpl.ghibli": "Ghibli",
+      "ai.tpl.kawaii": "Kawaii",
+      "ai.tpl.minimal": "Minimal",
+      "ai.tpl.watercolor": "Watercolor",
+      "ai.tpl.detail": "Detail",
+      "ai.tpl.vibrant": "Vibrant",
+      "ai.tpl.clean": "Clean BG",
+      "ai.tpl.master": "4K Master",
+      "ai.style": "Style",
+      "ai.style.default": "Default",
+      "ai.style.flat": "Flat Vector",
+      "ai.style.pixel": "Pixel Art",
+      "ai.style.kawaii": "Kawaii Sticker",
+      "ai.style.minimal": "Line Art",
+      "ai.provider": "Provider",
+      "ai.provider.comfy": "Local ComfyUI (127.0.0.1:8188)",
+      "ai.provider.sd": "Local A1111 (127.0.0.1:7860)",
+      "ai.provider.cogview": "Cloud Zhipu CogView",
+      "ai.provider.wanx": "Cloud Tongyi Wanx",
+      "ai.provider.mock": "Mock (no key needed)",
+      "ai.presets": "Presets:",
+      "ai.preset.anime": "Anime",
+      "ai.preset.illustration": "Illustration",
+      "ai.preset.pixel": "Pixel",
+      "ai.preset.realistic": "Realistic",
+      "ai.model": "Model (ComfyUI)",
+      "ai.model.auto": "(auto-select first)",
+      "ai.negative": "Negative Prompt",
+      "ai.steps": "Steps",
+      "ai.cfg": "CFG",
+      "ai.sampler": "Sampler",
+      "ai.scheduler": "Scheduler",
+      "ai.size": "Size",
+      "ai.generate": "Generate Image",
+      "ai.status": "Current provider:",
+      "ai.convert": "Convert to Pattern →",
+      "ai.note": "Mock uses local placeholder images (no key needed). Add key in config.js and switch provider for real API (Zhipu CogView / Tongyi Wanx). Keys stay on server only.",
+      // swatch
+      "swatch.size": "Palette Size",
+      "swatch.search": "Search color / hex, e.g. A1 or #fa",
+      "swatch.note": "HEX values are screen references only. Verify against official physical color cards.",
+      // paywall
+      "paywall.title": "Upgrade Pro",
+      "paywall.note": "Free: preview (watermarked) + material list. Pro: full HD/no watermark + SVG + A4 PDF + board cuts. Demo mode — connect payment to unlock.",
+      "paywall.cancel": "Later",
+      "paywall.unlock": "Simulate Unlock (Demo)",
+      // bulk modal
+      "bulk.title": "Bulk Recolor",
+      "bulk.from": "From",
+      "bulk.to": "To",
+      "bulk.cancel": "Cancel",
+      "bulk.apply": "Apply",
+      // text popover
+      "text.title": "Enter text (fills beads with current color)",
+      "text.placeholder": "e.g. ABC / Hello",
+      "text.height": "Height (beads)",
+      "text.cancel": "Cancel",
+      "text.ok": "Apply",
+      // library
+      "lib.title": "My Pattern Library",
+      "lib.name.placeholder": "Pattern name (e.g. Cat Face 58)",
+      "lib.tags.placeholder": "Tags, space or comma separated",
+      "lib.save": "Save to Library",
+      "lib.note": "Patterns saved locally (offline) and on server.",
+      // history
+      "hist.title": "Auto Save",
+      "hist.subtitle": "Auto-saves every 5 min, max 10 entries. Click to restore.",
+      "hist.empty": "No saves yet. Generate a pattern to start.",
+      "hist.restore": "Restore this save? Unsaved changes will be lost.",
+      // shortcuts
+      "sc.title": "Keyboard Shortcuts",
+      "sc.global": "Global",
+      "sc.editable": "Edit Mode (customizable)",
+      "sc.canvas": "Canvas",
+      "sc.reset": "Reset Defaults",
+      "sc.close": "Close",
+      // tutorial
+      "tut.title": "Quick Start",
+      "tut.skip": "Skip",
+      "tut.next": "Next",
+      "tut.finish": "Get Started",
+      // dark mode
+      "dark.tip": "Dark/Light Mode",
+      // versions
+      "ver.title": "Version History",
+      "ver.empty": "No versions yet",
+      // calc
+      "calc.title": "Perler Size Calculator",
+    },
+  };
+
+  function t(key) {
+    return (translations[currentLang] && translations[currentLang][key]) || translations.zh[key] || key;
+  }
+
+  function setLang(lang) {
+    if (!translations[lang]) return;
+    currentLang = lang;
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch(e) {}
+    document.documentElement.setAttribute("lang", lang === "zh" ? "zh-CN" : "en");
+    applyTranslations();
+  }
+
+  function getLang() { return currentLang; }
+
+  function applyTranslations() {
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      const text = t(key);
+      if (text) el.textContent = text;
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-title");
+      const text = t(key);
+      if (text) el.setAttribute("title", text);
+    });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-placeholder");
+      const text = t(key);
+      if (text) el.setAttribute("placeholder", text);
+    });
+  }
+
+  function init() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved && translations[saved]) currentLang = saved;
+    } catch(e) {}
+    document.documentElement.setAttribute("lang", currentLang === "zh" ? "zh-CN" : "en");
+  }
+
+  init();
+  return { t, setLang, getLang, applyTranslations };
+})();

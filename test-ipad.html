@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iPad 模拟器 — 拼豆图稿</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      background: #0a0a1a;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 顶部工具栏 */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #16213e;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+    .toolbar .title { font-size: 13px; font-weight: 700; color: #4fc3f7; white-space: nowrap; }
+    .toolbar label { font-size: 11px; color: #999; white-space: nowrap; }
+    .toolbar select, .toolbar button {
+      padding: 5px 10px; border: 1px solid #444; border-radius: 5px;
+      background: #0f3460; color: #fff; font-size: 11px; cursor: pointer;
+    }
+    .toolbar select:hover, .toolbar button:hover { background: #1a508b; }
+    .toolbar button.active { background: #e94560; border-color: #e94560; }
+    .toolbar .sep { width: 1px; height: 18px; background: #333; flex-shrink: 0; }
+    .toolbar .info { margin-left: auto; font-size: 10px; color: #666; font-family: monospace; white-space: nowrap; }
+
+    /* 设备区域：占满剩余空间 */
+    .device-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 屏幕容器：用 transform 缩放 */
+    .screen-wrap {
+      position: absolute;
+      transform-origin: center center;
+    }
+
+    /* iPad 边框（极简） */
+    .ipad-bezel {
+      position: absolute;
+      inset: -8px;
+      border: 3px solid #222;
+      border-radius: 18px;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .ipad-bezel::before {
+      content: "";
+      position: absolute;
+      top: -5px; left: 50%; transform: translateX(-50%);
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #1a1a1a;
+    }
+
+    /* iframe 容器 */
+    .screen {
+      position: relative;
+      background: #fff;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .screen iframe {
+      display: block;
+      border: none;
+    }
+
+    /* 触控层 */
+    .touch-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      cursor: none;
+    }
+    .touch-dot {
+      position: fixed;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: rgba(233,69,96,0.45);
+      border: 2px solid rgba(233,69,96,0.7);
+      transform: translate(-50%,-50%);
+      pointer-events: none;
+      z-index: 9999;
+      display: none;
+    }
+    .touch-dot.on { display: block; }
+
+    /* 底部信息 */
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 5px 12px;
+      background: #111;
+      flex-shrink: 0;
+      font-size: 10px;
+      color: #555;
+    }
+    .bottom-bar .key { color: #888; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span class="title">📱 iPad</span>
+    <div class="sep"></div>
+    <label>设备</label>
+    <select id="selDevice">
+      <option value="9.7">9.7" (768×1024)</option>
+      <option value="10.2" selected>10.2" (810×1080)</option>
+      <option value="11">11" (834×1194)</option>
+      <option value="12.9">12.9" (1024×1366)</option>
+      <option value="air">Air 11 (820×1180)</option>
+      <option value="mini">mini (744×1133)</option>
+    </select>
+    <div class="sep"></div>
+    <button id="btnOrient">竖屏</button>
+    <div class="sep"></div>
+    <label>DPR</label>
+    <select id="selDpr">
+      <option value="1">1x</option>
+      <option value="2" selected>2x</option>
+      <option value="3">3x</option>
+    </select>
+    <div class="sep"></div>
+    <button id="btnTouch" class="active">触控</button>
+    <button id="btnReload">↻</button>
+    <span class="info" id="infoLabel">--</span>
+  </div>
+
+  <div class="device-area" id="deviceArea">
+    <div class="screen-wrap" id="screenWrap">
+      <div class="ipad-bezel"></div>
+      <div class="screen" id="screen">
+        <iframe id="appFrame" src="index.html?tablet=1" allow="cross-origin-isolated"></iframe>
+        <div class="touch-layer" id="touchLayer"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="touch-dot" id="touchDot"></div>
+
+  <div class="bottom-bar">
+    <span>点击=轻触</span>
+    <span>拖拽=滑动</span>
+    <span>滚轮=缩放</span>
+    <span class="key">← → 切换设备</span>
+    <span class="key">O 切换方向</span>
+  </div>
+
+<script>
+const DEVICES = {
+  "9.7":  { w: 768,  h: 1024 },
+  "10.2": { w: 810,  h: 1080 },
+  "11":   { w: 834,  h: 1194 },
+  "12.9": { w: 1024, h: 1366 },
+  "air":  { w: 820,  h: 1180 },
+  "mini": { w: 744,  h: 1133 },
+};
+const DEV_LIST = Object.keys(DEVICES);
+
+let devIdx = 1;
+let portrait = true;
+let dpr = 2;
+let touchOn = true;
+let dragging = false;
+let lastX = 0, lastY = 0;
+
+const $ = (s) => document.querySelector(s);
+const frame = $("#appFrame");
+const screenEl = $("#screen");
+const wrap = $("#screenWrap");
+const area = $("#deviceArea");
+const touchLayer = $("#touchLayer");
+const touchDot = $("#touchDot");
+const info = $("#infoLabel");
+
+function sz() {
+  const d = DEVICES[DEV_LIST[devIdx]];
+  return portrait ? { w: d.w, h: d.h } : { w: d.h, h: d.w };
+}
+
+function fit() {
+  const s = sz();
+  const areaW = area.clientWidth;
+  const areaH = area.clientHeight;
+  const scale = Math.min(areaW / (s.w + 20), areaH / (s.h + 20), 1);
+
+  // 设置 iframe 实际尺寸
+  frame.style.width = s.w + "px";
+  frame.style.height = s.h + "px";
+  screenEl.style.width = s.w + "px";
+  screenEl.style.height = s.h + "px";
+
+  // 缩放包裹容器
+  wrap.style.width = s.w + "px";
+  wrap.style.height = s.h + "px";
+  wrap.style.left = "50%";
+  wrap.style.top = "50%";
+  wrap.style.transform = `translate(-50%, -50%) scale(${scale})`;
+
+  // 更新 viewport
+  try {
+    const doc = frame.contentDocument;
+    if (doc) {
+      const meta = doc.querySelector('meta[name="viewport"]');
+      if (meta) meta.setAttribute("content", `width=${s.w},initial-scale=1,viewport-fit=cover`);
+    }
+  } catch(e) {}
+
+  const orient = portrait ? "竖屏" : "横屏";
+  info.textContent = `${DEV_LIST[devIdx]}" ${s.w}×${s.h} dpr=${dpr} ${orient}`;
+}
+
+// 设备切换
+$("#selDevice").addEventListener("change", (e) => {
+  devIdx = DEV_LIST.indexOf(e.target.value);
+  fit();
+});
+$("#selDpr").addEventListener("change", (e) => { dpr = +e.target.value; fit(); });
+$("#btnOrient").addEventListener("click", () => {
+  portrait = !portrait;
+  $("#btnOrient").textContent = portrait ? "竖屏" : "横屏";
+  fit();
+});
+$("#btnTouch").addEventListener("click", () => {
+  touchOn = !touchOn;
+  $("#btnTouch").classList.toggle("active", touchOn);
+  touchLayer.style.pointerEvents = touchOn ? "auto" : "none";
+});
+$("#btnReload").addEventListener("click", () => { frame.src = "index.html?tablet=1"; });
+
+// 键盘快捷键
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight") { devIdx = (devIdx + 1) % DEV_LIST.length; $("#selDevice").value = DEV_LIST[devIdx]; fit(); }
+  else if (e.key === "ArrowLeft") { devIdx = (devIdx - 1 + DEV_LIST.length) % DEV_LIST.length; $("#selDevice").value = DEV_LIST[devIdx]; fit(); }
+  else if (e.key === "o" || e.key === "O") { $("#btnOrient").click(); }
+});
+
+// 触控模拟
+function frameCoords(e) {
+  const r = screenEl.getBoundingClientRect();
+  const s = sz();
+  return { x: (e.clientX - r.left) * s.w / r.width, y: (e.clientY - r.top) * s.h / r.height };
+}
+function emit(type, x, y) {
+  try {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    const el = doc.elementFromPoint(x, y);
+    if (!el) return;
+    el.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, clientX: x, clientY: y,
+      pointerId: 1, pointerType: "touch", isPrimary: true,
+      view: frame.contentWindow,
+    }));
+  } catch(e) {}
+}
+
+touchLayer.addEventListener("mousedown", (e) => {
+  if (!touchOn) return;
+  dragging = true;
+  const c = frameCoords(e);
+  touchDot.classList.add("on");
+  moveDot(e);
+  emit("pointerdown", c.x, c.y);
+  lastX = e.clientX; lastY = e.clientY;
+});
+touchLayer.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  moveDot(e);
+  const c = frameCoords(e);
+  emit("pointermove", c.x, c.y);
+  lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener("mouseup", () => {
+  if (!dragging) return;
+  dragging = false;
+  touchDot.classList.remove("on");
+  const c = frameCoords({ clientX: lastX, clientY: lastY });
+  emit("pointerup", c.x, c.y);
+});
+function moveDot(e) {
+  touchDot.style.left = e.clientX + "px";
+  touchDot.style.top = e.clientY + "px";
+}
+
+touchLayer.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  try {
+    const c = frameCoords(e);
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    const el = doc.elementFromPoint(c.x, c.y);
+    if (el) el.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true, cancelable: true,
+      deltaY: e.deltaY, deltaX: e.deltaX,
+      clientX: c.x, clientY: c.y,
+      view: frame.contentWindow,
+    }));
+  } catch(ex) {}
+}, { passive: false });
+
+fit();
+window.addEventListener("resize", fit);
+</script>
+</body>
+</html>

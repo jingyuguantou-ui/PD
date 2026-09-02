@@ -73,6 +73,9 @@ const state = {
   symmetry: "none",
   tempShape: null,
   sel: null,
+  watermarkText: "拼豆图稿平台",
+  watermarkOpacity: 0.1,
+  watermarkAngle: -30,
 };
 
 let previewCellSize = 0;
@@ -87,6 +90,8 @@ let clipboard = null;
 let edgeCache = null;
 let textStart = null;
 let _redrawQueued = false;
+let mainUndoStack = [];
+let mainRedoStack = [];
 function scheduleRedraw() {
   if (_redrawQueued) return;
   _redrawQueued = true;
@@ -611,17 +616,17 @@ function renderPattern(canvas, result, cellSize, opts = {}) {
 
   if (opts.watermark) {
     ctx.save();
-    ctx.globalAlpha = 0.1;
+    ctx.globalAlpha = state.watermarkOpacity;
     ctx.fillStyle = "#333";
     ctx.font = "bold 22px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(-Math.PI / 6);
+    ctx.rotate(state.watermarkAngle * Math.PI / 180);
     const span = Math.max(canvas.width, canvas.height);
     for (let y = -span; y < span; y += 120) {
       for (let x = -span; x < span; x += 260) {
-        ctx.fillText("拼豆图稿平台", x, y);
+        ctx.fillText(state.watermarkText, x, y);
       }
     }
     ctx.restore();
@@ -981,7 +986,7 @@ function getEdgeCanvas() {
 }
 
 function exportBoards() {
-  if (!state.result) return;
+  if (!state.result) { setHint("请先生成图纸，再导出"); return; }
   if (!state.pro) {
     openPaywall("分板裁切图（每板一页）为 Pro 功能");
     return;
@@ -1252,10 +1257,43 @@ function updateInfoPanel() {
       ? `<span><b>背景</b> 已去 ${bgCount} 格（不计入珠数）</span>`
       : `<span><b>背景</b> 未去（计入珠数）</span>`) +
     `<span><b>估算用料</b> ≈ ¥${cost}（约 ${packs} 包·5mm混装≈¥9/1000颗）</span>`;
+  renderMaterialsList();
+}
+
+function renderMaterialsList() {
+  const el = $("#materialsPanel");
+  const res = state.result;
+  if (!el || !res) { if (el) el.hidden = true; return; }
+  const items = tallyByCode(res);
+  if (!items.length) { el.hidden = true; return; }
+  el.hidden = false;
+  const total = items.reduce((s, c) => s + c.count, 0);
+  const totalPacks = Math.max(1, Math.ceil(total / BEAD_PACK_SIZE));
+  const totalCost = totalPacks * BEAD_PACK_PRICE;
+  const body = el.querySelector(".mat-body") || el;
+  let html = '<table class="mat-table"><thead><tr><th>颜色</th><th>色号</th><th>数量</th><th>需购包数</th><th>小计</th></tr></thead><tbody>';
+  for (const it of items) {
+    const packs = Math.max(1, Math.ceil(it.count / BEAD_PACK_SIZE));
+    const cost = packs * BEAD_PACK_PRICE;
+    html += `<tr>
+      <td><span class="mat-swatch" style="background:${it.hex}"></span>${it.code}</td>
+      <td>${it.hex}</td>
+      <td><b>${it.count}</b></td>
+      <td>${packs} 包</td>
+      <td>¥${cost}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  html += `<div class="mat-total">
+    <span>共 ${items.length} 色 · ${total} 颗</span>
+    <span>≈ ¥${totalCost}（${totalPacks} 包）</span>
+  </div>`;
+  body.innerHTML = html;
 }
 
 function run() {
   if (!state.img) return;
+  saveMainSnapshot();
   const result = processImage(state.img, state.cols, state.paletteKey, state.paletteSize, state.maxColors, {
     removeBg: state.removeBg,
     bgTol: state.bgTol,
@@ -1266,10 +1304,235 @@ function run() {
   edgeCache = null;
   redraw();
   saveProject();
+  try { Versions.saveVersion("自动保存", currentDrawingPayload()); } catch(e) {}
+  History.saveNow();
+}
+
+const History = (() => {
+  const KEY = "pindou-history";
+  const MAX = 10;
+  const INTERVAL = 5 * 60 * 1000;
+  let timer = null;
+  let lastSave = 0;
+
+  function getAll() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e) { return []; }
+  }
+  function persist(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list)); } catch(e) {}
+  }
+  function snapshot() {
+    if (!state.result || !state.result.grid) return null;
+    const data = currentDrawingPayload();
+    return {
+      ts: Date.now(),
+      payload: data,
+      grid: data.grid,
+      cols: data.gcols,
+      rows: data.grows,
+      palette: data.p.paletteKey,
+      colorCount: data.grid.flat().filter(c => c && c.hex !== "#ffffff").length,
+     珠数: data.grid.flat().length,
+    };
+  }
+  function saveNow() {
+    if (!state.result) return;
+    const s = snapshot();
+    if (!s) return;
+    const all = getAll();
+    all.unshift(s);
+    if (all.length > MAX) all.length = MAX;
+    persist(all);
+    lastSave = Date.now();
+  }
+  function tick() {
+    if (!state.result) return;
+    if (Date.now() - lastSave >= INTERVAL) saveNow();
+  }
+  function start() {
+    if (timer) return;
+    timer = setInterval(tick, 30 * 1000);
+    lastSave = Date.now();
+  }
+  function stop() {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+  function restore(entry) {
+    if (!entry || !entry.payload) return;
+    const p = entry.payload;
+    state.cols = p.p.cols;
+    state.paletteKey = p.p.paletteKey;
+    state.paletteSize = p.p.paletteSize;
+    state.colorMode = p.p.colorMode;
+    state.maxColors = p.p.maxColors;
+    state.boardOrientation = p.p.boardOrientation;
+    state.removeBg = p.p.removeBg;
+    state.bgTol = p.p.bgTol;
+    state.edgeAware = p.p.edgeAware;
+    state.outlineMode = p.p.outlineMode;
+    state.pixelWhiteBg = p.p.pixelWhiteBg;
+    state.mode = p.p.mode;
+    state.showGhost = p.p.showGhost;
+    if (p.grid) {
+      const palette = getActivePalette(state.paletteKey, state.paletteSize);
+      state.result = {
+        grid: p.grid,
+        cols: p.gcols,
+        rows: p.grows,
+        counts: (() => {
+          const counts = new Array(palette.length).fill(0);
+          for (const row of p.grid) for (const c of row) {
+            const idx = palette.findIndex(px => px.hex === c.hex);
+            if (idx >= 0) counts[idx]++;
+          }
+          return counts;
+        })(),
+      };
+      edgeCache = null;
+      syncControlsFromState();
+      redraw();
+    }
+  }
+  function removeAt(idx) {
+    const all = getAll();
+    all.splice(idx, 1);
+    persist(all);
+  }
+  function show() {
+    let overlay = document.getElementById("histOverlay");
+    if (overlay) { overlay.remove(); return; }
+    const all = getAll();
+    overlay = document.createElement("div");
+    overlay.id = "histOverlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483647;display:flex;align-items:center;justify-content:center";
+    let html = '<div class="panel" style="width:420px;max-width:90vw;max-height:80vh;overflow-y:auto;padding:20px">';
+    html += '<h3 style="margin:0 0 4px">自动存档</h3>';
+    html += '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">每 5 分钟自动保存，最多 ' + MAX + ' 条，点击恢复</div>';
+    if (!all.length) {
+      html += '<div style="text-align:center;color:var(--muted);padding:24px">暂无存档，生成图稿后开始自动保存</div>';
+    } else {
+      html += '<div style="display:flex;flex-direction:column;gap:6px">';
+      for (let i = 0; i < all.length; i++) {
+        const h = all[i];
+        const d = new Date(h.ts);
+        const dateStr = d.toLocaleDateString("zh-CN") + " " + d.toLocaleTimeString("zh-CN", {hour:"2-digit",minute:"2-digit"});
+        html += `<div class="hist-row" data-idx="${i}" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--border);border-radius:var(--btn-radius);background:var(--panel-2);cursor:pointer;transition:background .15s">
+          <div style="font-size:13px"><b>${h.cols}×${h.rows}</b> · ${h.colorCount}色 · ${h.珠数}颗</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--muted)">${dateStr}</span>
+            <button class="hist-del" data-idx="${i}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 4px" title="删除">×</button>
+          </div>
+        </div>`;
+      }
+      html += '</div>';
+    }
+    html += '<div style="text-align:right;margin-top:12px"><button id="histClose" style="padding:6px 16px;border:2px solid var(--border-strong);border-radius:6px;background:var(--panel);cursor:pointer;font-size:13px;color:var(--text)">关闭</button></div>';
+    html += '</div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector("#histClose").addEventListener("click", () => overlay.remove());
+    overlay.querySelectorAll(".hist-row").forEach(row => {
+      row.addEventListener("click", (e) => {
+        if (e.target.classList.contains("hist-del")) return;
+        const idx = parseInt(row.dataset.idx);
+        const entry = all[idx];
+        if (entry && confirm("恢复到此存档？当前未保存的修改将丢失")) {
+          restore(entry);
+          overlay.remove();
+        }
+      });
+      row.addEventListener("mouseenter", () => row.style.background = "var(--panel)");
+      row.addEventListener("mouseleave", () => row.style.background = "var(--panel-2)");
+    });
+    overlay.querySelectorAll(".hist-del").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        removeAt(idx);
+        overlay.remove();
+        show();
+      });
+    });
+  }
+  start();
+  return { show, saveNow, stop };
+})();
+
+let _snapshotCanvas = null;
+let _snapshotLabel = "";
+
+function takeSnapshot() {
+  if (!state.result) return;
+  const pv = $("#preview");
+  _snapshotCanvas = document.createElement("canvas");
+  _snapshotCanvas.width = pv.width;
+  _snapshotCanvas.height = pv.height;
+  _snapshotCanvas.getContext("2d").drawImage(pv, 0, 0);
+  const res = state.result;
+  _snapshotLabel = `${res.cols}×${res.rows} · ${new Date().toLocaleTimeString("zh-CN")}`;
+  setHint("快照已保存：" + _snapshotLabel);
+  const btn = $("#compareSnapshotBtn");
+  if (btn) btn.disabled = false;
+}
+
+function compareWithSnapshot() {
+  if (!_snapshotCanvas || !state.result) return;
+  let overlay = document.getElementById("compareOverlay");
+  if (overlay) { overlay.remove(); return; }
+  const pv = $("#preview");
+  overlay = document.createElement("div");
+  overlay.id = "compareOverlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:2147483647;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:20px";
+  const box = document.createElement("div");
+  box.style.cssText = "position:relative;overflow:hidden;border:3px solid var(--border-strong);border-radius:8px;max-width:90vw;max-height:75vh;cursor:ew-resize;touch-action:none";
+  const cw = Math.min(_snapshotCanvas.width, 600);
+  const ch = Math.round(cw * _snapshotCanvas.height / _snapshotCanvas.width);
+  const cvL = document.createElement("canvas");
+  cvL.width = cw; cvL.height = ch;
+  cvL.getContext("2d").drawImage(_snapshotCanvas, 0, 0, cw, ch);
+  cvL.style.cssText = "display:block;width:" + cw + "px;height:" + ch + "px";
+  const cvR = document.createElement("canvas");
+  cvR.width = cw; cvR.height = ch;
+  cvR.getContext("2d").drawImage(pv, 0, 0, cw, ch);
+  cvR.style.cssText = "display:block;width:" + cw + "px;height:" + ch + "px;position:absolute;top:0;left:0;clip-path:inset(0 50% 0 0)";
+  const slider = document.createElement("div");
+  slider.style.cssText = "position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;z-index:2;pointer-events:none;transform:translateX(-50%)";
+  const lblL = document.createElement("div");
+  lblL.textContent = "快照 (" + _snapshotLabel + ")";
+  lblL.style.cssText = "position:absolute;top:8px;left:8px;background:rgba(0,0,0,.6);color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;z-index:3";
+  const lblR = document.createElement("div");
+  lblR.textContent = "当前";
+  lblR.style.cssText = "position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;z-index:3";
+  box.appendChild(cvL); box.appendChild(cvR); box.appendChild(slider); box.appendChild(lblL); box.appendChild(lblR);
+  let dragging = false;
+  const ac = new AbortController();
+  const opts = { signal: ac.signal };
+  function moveSlider(clientX) {
+    const r = box.getBoundingClientRect();
+    let pct = ((clientX - r.left) / r.width) * 100;
+    pct = Math.max(0, Math.min(100, pct));
+    slider.style.left = pct + "%";
+    cvR.style.clipPath = "inset(0 " + (100 - pct) + "% 0 0)";
+  }
+  box.addEventListener("mousedown", (e) => { dragging = true; moveSlider(e.clientX); }, opts);
+  box.addEventListener("mousemove", (e) => { if (dragging) moveSlider(e.clientX); }, opts);
+  box.addEventListener("mouseup", () => dragging = false, opts);
+  box.addEventListener("touchstart", (e) => { dragging = true; moveSlider(e.touches[0].clientX); }, { ...opts, passive: true });
+  box.addEventListener("touchmove", (e) => { if (dragging) moveSlider(e.touches[0].clientX); }, { ...opts, passive: true });
+  box.addEventListener("touchend", () => dragging = false, opts);
+  const closeBtn = document.createElement("button");
+  closeBtn.textContent = "关闭对比";
+  closeBtn.style.cssText = "padding:8px 20px;border:2px solid #fff;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;font-size:14px";
+  closeBtn.onclick = () => { ac.abort(); overlay.remove(); };
+  overlay.appendChild(box);
+  overlay.appendChild(closeBtn);
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) { ac.abort(); overlay.remove(); } });
 }
 
 function enableOutputs() {
-    ["exportPreview", "exportFull", "exportSvg", "exportPdf", "exportPack", "exportBoards", "exportPixel", "editToggle", "saveDrawingBtn"].forEach(
+    ["exportPreview", "exportFull", "exportSvg", "exportPdf", "exportPack", "exportBoards", "exportPixel", "editToggle", "saveDrawingBtn", "shareBtn", "exportJpg", "exportBmp", "compareBtn"].forEach(
     (id) => {
       const el = $("#" + id);
       if (el) el.disabled = false;
@@ -1477,77 +1740,81 @@ async function saveDrawing() {
     ? tagsEl.value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean)
     : [];
   const payload = currentDrawingPayload({ name, tags, thumb: makeThumb(), createdAt: Date.now() });
+  let savedOk = false;
+  let savedId = null;
   try {
     const r = await apiJSON("/api/library", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (r.ok) {
-      setHint("已存入图纸库：" + name);
-      if (nameEl) nameEl.value = "";
-      if (tagsEl) tagsEl.value = "";
-      loadLibraryList();
-    } else {
-      alert("保存失败：" + (r.error || ""));
-    }
-  } catch (e) {
-    alert("保存失败：" + e.message);
-  }
+    if (r.ok) { savedOk = true; savedId = r.id; }
+  } catch (e) {}
+  if (savedId) payload.id = savedId;
+  else payload.id = "local-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  try { await LibraryDB.put(payload); } catch (e) {}
+  setHint(savedOk ? "已同步保存到图纸库：" + name : "已保存到本机（离线）：" + name);
+  if (nameEl) nameEl.value = "";
+  if (tagsEl) tagsEl.value = "";
+  loadLibraryList();
 }
 async function loadDrawing(id) {
+  let data = null;
   try {
-    const r = await apiJSON("/api/library/" + encodeURIComponent(id));
-    if (r && r.grid) {
-      applyDrawingData(r);
-      closeLibrary();
-      setHint("已载入图纸：" + (r.name || id));
-    } else {
-      alert("载入失败：图纸数据缺失");
-    }
-  } catch (e) {
-    alert("载入失败：" + e.message);
+    data = await apiJSON("/api/library/" + encodeURIComponent(id));
+    if (!data || !data.grid) data = null;
+  } catch (e) {}
+  if (!data) {
+    try { data = await LibraryDB.get(id); } catch (e) {}
+  }
+  if (data && data.grid) {
+    applyDrawingData(data);
+    closeLibrary();
+    setHint("已载入图纸：" + (data.name || id));
+  } else {
+    alert("载入失败：图纸数据不存在");
   }
 }
 async function deleteDrawing(id, name) {
   if (!confirm("确定删除图纸「" + name + "」？此操作不可撤销。")) return;
-  try {
-    const r = await apiJSON("/api/library/" + encodeURIComponent(id), { method: "DELETE" });
-    if (r.ok) loadLibraryList();
-    else alert("删除失败：" + (r.error || ""));
-  } catch (e) {
-    alert("删除失败：" + e.message);
-  }
+  try { await apiJSON("/api/library/" + encodeURIComponent(id), { method: "DELETE" }); } catch (e) {}
+  try { await LibraryDB.del(id); } catch (e) {}
+  loadLibraryList();
 }
 async function renameDrawing(id, name) {
   const nn = prompt("重命名图纸：", name);
   if (nn == null) return;
+  const newName = nn.trim() || name;
   try {
-    const r = await apiJSON("/api/library/" + encodeURIComponent(id), {
+    await apiJSON("/api/library/" + encodeURIComponent(id), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nn.trim() || name }),
+      body: JSON.stringify({ name: newName }),
     });
-    if (r.ok) loadLibraryList();
-    else alert("重命名失败：" + (r.error || ""));
-  } catch (e) {
-    alert("重命名失败：" + e.message);
-  }
+  } catch (e) {}
+  try {
+    const local = await LibraryDB.get(id);
+    if (local) { local.name = newName; await LibraryDB.put(local); }
+  } catch (e) {}
+  loadLibraryList();
 }
 async function loadLibraryList() {
   const grid = $("#libraryGrid");
   if (!grid) return;
   grid.innerHTML = '<p class="muted">加载中…</p>';
-  let list = [];
+  let serverList = [];
+  let localList = [];
   try {
     const data = await apiJSON("/api/library");
-    list = Array.isArray(data) ? data : [];
-  } catch (e) {
-    grid.innerHTML = '<p class="muted">读取图纸库失败：' + escapeHtml(e.message) + "</p>";
-    return;
-  }
+    serverList = Array.isArray(data) ? data : [];
+  } catch (e) {}
+  try { localList = await LibraryDB.list(); } catch (e) {}
+  const merged = new Map();
+  for (const m of serverList) merged.set(m.id, m);
+  for (const m of localList) { if (!merged.has(m.id)) merged.set(m.id, m); }
+  const list = [...merged.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (!list.length) {
-    grid.innerHTML = '<p class="muted">图纸库还是空的。先生成一张图纸，填好名称，点「保存到图纸库」。</p>';
+    grid.innerHTML = '<p class="muted">图纸库还是空的。先生成一张图纸，填好名称，点「保存到图纸库」。<br>图纸会同时保存到本机（离线可用）和服务器。</p>';
     return;
   }
   grid.innerHTML = list
@@ -1559,7 +1826,7 @@ async function loadLibraryList() {
         <div class="lib-name">${escapeHtml(m.name)}</div>
         <div class="lib-sub muted small">${m.cols}×${m.rows} 格 · ${m.w}×${m.h} cm${
         m.tags && m.tags.length ? " · " + m.tags.map(escapeHtml).join(" / ") : ""
-      }</div>
+      }${String(m.id).startsWith("local-") ? ' · <span title="仅本机，未同步到服务器" style="color:var(--accent)">&#9679; 本地</span>' : ""}</div>
         <div class="lib-actions">
           <button class="mini-btn" data-load="${m.id}">载入</button>
           <button class="mini-btn" data-rename="${m.id}" data-name="${escapeHtml(m.name)}">重命名</button>
@@ -1597,6 +1864,8 @@ function clearProject() {
   state.mode = "bead";
   state.showGhost = false;
   syncControlsFromState();
+  const bf = $("#batchFile");
+  if (bf) bf.value = "";
   const pv = $("#preview");
   if (pv) pv.getContext("2d").clearRect(0, 0, pv.width, pv.height);
   const lg = $("#legend");
@@ -1605,6 +1874,8 @@ function clearProject() {
   if (bi) bi.textContent = "";
   const ip = $("#infoPanel");
   if (ip) ip.innerHTML = "";
+  const mp = $("#materialsPanel");
+  if (mp) { mp.innerHTML = ""; mp.hidden = true; }
     ["exportPreview", "exportFull", "exportSvg", "exportPdf", "exportPack", "exportBoards", "exportPixel", "editToggle"].forEach(
     (id) => {
       const el = $("#" + id);
@@ -1612,6 +1883,7 @@ function clearProject() {
     }
   );
   setHint("已新建，请上传图片或点「示例图」");
+  syncEmptyHint();
 }
 
 function makeSampleCanvas() {
@@ -1699,6 +1971,7 @@ function loadSample() {
     state._imgData = url;
     $("#runBtn").disabled = false;
     setHint("已加载示例图，可改参数或点生成");
+    syncEmptyHint();
     run();
   };
   im.src = url;
@@ -1722,6 +1995,11 @@ function reprocess() {
   run();
 }
 
+function syncEmptyHint() {
+  const h = $("#emptyHint");
+  if (h) h.style.display = (state.img || state.result) ? "none" : "";
+}
+
 function redraw() {
   const result = state.result;
   if (!result) return;
@@ -1740,10 +2018,13 @@ function redraw() {
   renderLegend($("#legend"), result);
   updateInfoPanel();
   updateBoardInfo();
-    ["exportPreview", "exportFull", "exportSvg", "exportPdf", "exportPack", "exportBoards", "exportPixel", "editToggle"].forEach(
-    (id) => ($("#" + id).disabled = false)
+    ["exportPreview", "exportFull", "exportSvg", "exportPdf", "exportPack", "exportBoards", "exportPixel", "editToggle", "exportJpg", "exportBmp", "compareBtn"].forEach(
+    (id) => { const el = $("#" + id); if (el) el.disabled = false; }
   );
+  const snapBtn = $("#snapshotBtn");
+  if (snapBtn) snapBtn.disabled = false;
   applyView();
+  syncEmptyHint();
 }
 
 function paintCellOnCanvas(r, c) {
@@ -1768,6 +2049,7 @@ function loadImage(file) {
       state._imgData = e.target.result;
       $("#runBtn").disabled = false;
       $("#hint").textContent = `已载入：${img.width}×${img.height}px`;
+      syncEmptyHint();
       run();
     };
     img.src = e.target.result;
@@ -1780,25 +2062,208 @@ function download(href, name) {
   const link = document.createElement("a");
   link.download = name;
   link.href = href;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
+  if (href.startsWith("blob:")) setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
+function downloadCanvas(canvas, name) {
+  canvas.toBlob((blob) => {
+    if (!blob) { download(canvas.toDataURL("image/png"), name); return; }
+    const url = URL.createObjectURL(blob);
+    download(url, name);
+  }, "image/png");
+}
+
+/* ---- 图片裁剪 ---- */
+let _cropImg = null, _cropCb = null;
+function openCrop(src, cb) {
+  _cropImg = src; _cropCb = cb;
+  const overlay = document.createElement("div");
+  overlay.id = "cropOverlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:2147483647;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:20px";
+  const info = document.createElement("div");
+  info.style.cssText = "color:#fff;font-size:14px;text-align:center";
+  info.textContent = "拖拽选择裁剪区域，点确定完成";
+  const box = document.createElement("div");
+  box.style.cssText = "position:relative;border:2px solid #fff;border-radius:4px;overflow:hidden;max-width:90vw;max-height:70vh";
+  const cvs = document.createElement("canvas");
+  const maxW = Math.min(window.innerWidth * 0.85, 600);
+  const maxH = Math.min(window.innerHeight * 0.65, 450);
+  const scale = Math.min(maxW / src.width, maxH / src.height, 1);
+  cvs.width = Math.round(src.width * scale);
+  cvs.height = Math.round(src.height * scale);
+  cvs.style.cssText = "display:block;touch-action:none";
+  const ctx = cvs.getContext("2d");
+  ctx.drawImage(src, 0, 0, cvs.width, cvs.height);
+  box.appendChild(cvs);
+  let sel = { x: 0, y: 0, w: cvs.width, h: cvs.height };
+  let dragging = false, startX = 0, startY = 0;
+  function drawSel() {
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    ctx.drawImage(src, 0, 0, cvs.width, cvs.height);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+    ctx.clearRect(sel.x, sel.y, sel.w, sel.h);
+    ctx.drawImage(src, sel.x, sel.y, sel.w, sel.h, sel.x, sel.y, sel.w, sel.h);
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+    ctx.strokeRect(sel.x, sel.y, sel.w, sel.h);
+  }
+  drawSel();
+  function getPos(e) {
+    const r = cvs.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function onStart(e) { e.preventDefault(); const p = getPos(e); dragging = true; startX = p.x; startY = p.y; }
+  function onMove(e) {
+    if (!dragging) return; e.preventDefault();
+    const p = getPos(e);
+    sel = { x: Math.max(0, Math.min(startX, p.x)), y: Math.max(0, Math.min(startY, p.y)), w: Math.abs(p.x - startX), h: Math.abs(p.y - startY) };
+    sel.w = Math.min(sel.w, cvs.width - sel.x); sel.h = Math.min(sel.h, cvs.height - sel.y);
+    drawSel();
+  }
+  function onEnd() { dragging = false; }
+  const ac = new AbortController();
+  const opts = { signal: ac.signal };
+  cvs.addEventListener("mousedown", onStart, opts); cvs.addEventListener("mousemove", onMove, opts); cvs.addEventListener("mouseup", onEnd, opts);
+  cvs.addEventListener("touchstart", onStart, { ...opts, passive: false }); cvs.addEventListener("touchmove", onMove, { ...opts, passive: false }); cvs.addEventListener("touchend", onEnd, opts);
+  const btns = document.createElement("div");
+  btns.style.cssText = "display:flex;gap:10px";
+  function mkBtn(label, primary) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.style.cssText = "padding:8px 20px;border-radius:6px;font-weight:700;cursor:pointer;font-size:14px;border:2px solid " + (primary ? "var(--primary,#2b6cff)" : "#666") + ";background:" + (primary ? "var(--primary,#2b6cff)" : "#333") + ";color:#fff";
+    return b;
+  }
+  const skipBtn = mkBtn("跳过裁剪", false);
+  const okBtn = mkBtn("确定裁剪", true);
+  skipBtn.onclick = () => { ac.abort(); overlay.remove(); _cropCb(src); };
+  okBtn.onclick = () => {
+    ac.abort(); overlay.remove();
+    if (sel.w < 10 || sel.h < 10) { _cropCb(src); return; }
+    const out = document.createElement("canvas");
+    const realScale = 1 / scale;
+    out.width = Math.round(sel.w * realScale);
+    out.height = Math.round(sel.h * realScale);
+    out.getContext("2d").drawImage(src, sel.x * realScale, sel.y * realScale, sel.w * realScale, sel.h * realScale, 0, 0, out.width, out.height);
+    const img = new Image();
+    img.onload = () => _cropCb(img);
+    img.src = out.toDataURL("image/png");
+  };
+  btns.appendChild(skipBtn); btns.appendChild(okBtn);
+  overlay.appendChild(info); overlay.appendChild(box); overlay.appendChild(btns);
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) { ac.abort(); overlay.remove(); _cropCb(src); } });
+}
+
+/* ---- 批量转换 ---- */
+let _batchQueue = [], _batchRunning = false;
+function startBatch(files) {
+  if (!files || !files.length) return;
+  _batchQueue = Array.from(files).filter(f => f.type.startsWith("image/"));
+  _batchRunning = true;
+  setHint("批量转换中（0/" + _batchQueue.length + "）…");
+  runBatchNext();
+}
+function runBatchNext() {
+  if (!_batchQueue.length) { _batchRunning = false; setHint("批量转换完成"); return; }
+  const f = _batchQueue.shift();
+  setHint("转换中（" + (_batchQueue.length) + " 剩余）…");
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      state.img = img;
+      state._imgData = e.target.result;
+      run();
+      downloadCanvas($("#preview"), "pindou-batch-" + f.name.replace(/\.[^.]+$/, "") + ".png");
+      setTimeout(runBatchNext, 300);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+/* ---- 图稿分享链接 ---- */
+function generateShareLink() {
+  if (!state.result) { setHint("请先生成图纸"); return; }
+  try {
+    const data = currentDrawingPayload();
+    const json = JSON.stringify(data);
+    const compressed = btoa(unescape(encodeURIComponent(json)));
+    const url = location.origin + location.pathname + "?share=" + compressed;
+    if (url.length > 8000) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(json).then(() => setHint("图纸 JSON 已复制（数据较大，已复制到剪贴板）"));
+      } else {
+        setHint("图纸数据较大，无法生成链接，请用「保存图纸」功能");
+      }
+      return;
+    }
+    history.replaceState(null, "", "?share=" + encodeURIComponent(compressed));
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => setHint("分享链接已复制到剪贴板"));
+    } else {
+      prompt("复制此链接分享：", url);
+    }
+  } catch (e) {
+    setHint("生成分享链接失败：" + e.message);
+  }
+}
+function tryLoadShare() {
+  const params = new URLSearchParams(location.search);
+  const share = params.get("share");
+  if (!share) return false;
+  try {
+    const json = decodeURIComponent(escape(atob(share)));
+    const data = JSON.parse(json);
+    if (data && data.grid) {
+      setTimeout(() => { applyDrawingData(data); setHint("已载入分享的图纸"); }, 500);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+/* ---- 主流程 undo/redo ---- */
+function saveMainSnapshot() {
+  if (!state.result) return;
+  mainUndoStack.push(JSON.stringify(currentDrawingPayload()));
+  if (mainUndoStack.length > 30) mainUndoStack.shift();
+  mainRedoStack = [];
+}
+function mainUndo() {
+  if (!mainUndoStack.length) return;
+  mainRedoStack.push(JSON.stringify(currentDrawingPayload()));
+  const prev = JSON.parse(mainUndoStack.pop());
+  applyDrawingData(prev);
+  setHint("已撤销");
+}
+function mainRedo() {
+  if (!mainRedoStack.length) return;
+  mainUndoStack.push(JSON.stringify(currentDrawingPayload()));
+  const next = JSON.parse(mainRedoStack.pop());
+  applyDrawingData(next);
+  setHint("已重做");
 }
 
 function exportPreview() {
   if (!state.result) return;
   const c = document.createElement("canvas");
   renderPattern(c, state.result, 14, { block: false, watermark: true });
-  download(c.toDataURL("image/png"), "pindou-preview-watermark.png");
+  downloadCanvas(c, "pindou-preview-watermark.png");
 }
 
 function exportFull() {
-  if (!state.result) return;
+  if (!state.result) { setHint("请先生成图纸，再导出"); return; }
   if (!state.pro) {
     openPaywall("完整高清图（无水印）为 Pro 功能");
     return;
   }
   const c = document.createElement("canvas");
   renderPattern(c, state.result, 24, { block: false, watermark: false });
-  download(c.toDataURL("image/png"), "pindou-full.png");
+  downloadCanvas(c, "pindou-full.png");
 }
 
 function exportPixelPng() {
@@ -1825,7 +2290,7 @@ function exportPixelPng() {
       ctx.fillRect(c2 * scale, r * scale, scale, scale);
     }
   }
-  download(c.toDataURL("image/png"), "pindou-pixel.png");
+  downloadCanvas(c, "pindou-pixel.png");
 }
 
 function buildSvg(result) {
@@ -1863,7 +2328,7 @@ function buildSvg(result) {
 }
 
 function exportSvg() {
-  if (!state.result) return;
+  if (!state.result) { setHint("请先生成图纸，再导出"); return; }
   if (!state.pro) {
     openPaywall("矢量 SVG（无水印）为 Pro 功能");
     return;
@@ -1907,7 +2372,7 @@ function renderLegendPage(pdf, result) {
 }
 
 function exportPdf() {
-  if (!state.result) return;
+  if (!state.result) { setHint("请先生成图纸，再导出"); return; }
   if (!state.pro) {
     openPaywall("分块打印 PDF（A4 分页）为 Pro 功能");
     return;
@@ -1927,48 +2392,104 @@ function exportPdf() {
   const pageW = 210;
   const pageH = 297;
   const margin = 10;
+  const headerH = 14;
+  const footerH = 10;
+  const rulerW = 8;
+  const availW = pageW - margin * 2 - rulerW;
+  const availH = pageH - margin * 2 - headerH - footerH;
   const landscape = bw >= bh;
   const colsPerPage = bw === bh ? 2 : landscape ? 1 : 3;
   const rowsPerPage = bw === bh ? 3 : landscape ? 4 : 2;
-  const availW = pageW - margin * 2;
-  const availH = pageH - margin * 2;
   const cellMm = Math.min(availW / colsPerPage / bw, availH / rowsPerPage / bh);
 
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
-  pdf.setFontSize(12);
-  pdf.setTextColor(20);
   const orientLabel =
-    state.boardOrientation === "h"
-      ? "横向 58×29"
-      : state.boardOrientation === "v"
-      ? "竖向 29×58"
-      : state.boardOrientation === "big"
-      ? "大方板 58×58"
-      : "正方 29×29";
-  pdf.text(`拼豆图稿 · 分块打印（共 ${total} 块，${orientLabel}，A4）`, margin, margin);
+    state.boardOrientation === "h" ? "横向 58×29"
+    : state.boardOrientation === "v" ? "竖向 29×58"
+    : state.boardOrientation === "big" ? "大方板 58×58"
+    : "正方 29×29";
+  const dateStr = new Date().toLocaleDateString("zh-CN");
+  const totalPages = Math.ceil(total / (colsPerPage * rowsPerPage)) + 1;
+
+  function drawHeader(pageNum) {
+    pdf.setFontSize(10);
+    pdf.setTextColor(100);
+    pdf.text(`拼豆图稿 · ${cols}×${rows} · ${orientLabel} · ${dateStr}`, margin, margin + 4);
+    pdf.setFontSize(8);
+    pdf.setTextColor(150);
+    pdf.text(`第 ${pageNum}/${totalPages} 页`, pageW - margin, margin + 4, { align: "right" });
+    pdf.setDrawColor(200);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, margin + 6, pageW - margin, margin + 6);
+  }
+
+  function drawFooter(pageNum) {
+    const fy = pageH - margin;
+    pdf.setDrawColor(200);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, fy - 2, pageW - margin, fy - 2);
+    pdf.setFontSize(7);
+    pdf.setTextColor(160);
+    pdf.text(`拼豆图稿平台 · ${cols}×${rows} · ${total}颗 · ${total}块`, margin, fy + 2);
+    pdf.text(`第 ${pageNum}/${totalPages} 页`, pageW - margin, fy + 2, { align: "right" });
+  }
+
+  function drawRuler(x, yStart, yEnd) {
+    pdf.setDrawColor(180);
+    pdf.setLineWidth(0.2);
+    pdf.setFontSize(5);
+    pdf.setTextColor(150);
+    for (let mm = 0; mm <= (yEnd - yStart); mm += 5) {
+      const y = yStart + mm;
+      const isCm = mm % 10 === 0;
+      const tickW = isCm ? 4 : 2;
+      pdf.line(x, y, x + tickW, y);
+      if (isCm && mm > 0) {
+        pdf.text(String(mm / 10), x + tickW + 1, y + 1.2);
+      }
+    }
+  }
 
   let placed = 0;
+  let pageNum = 1;
   for (let by = 0; by < byCount; by++) {
     for (let bx = 0; bx < bxCount; bx++) {
-      const k = by * bxCount + bx + 1;
       const pos = placed % (colsPerPage * rowsPerPage);
-      if (placed > 0 && pos === 0) pdf.addPage();
+      if (placed > 0 && pos === 0) {
+        pdf.addPage();
+        pageNum++;
+      }
+      if (pos === 0) {
+        drawHeader(pageNum);
+        drawFooter(pageNum);
+        drawRuler(pageW - margin - rulerW + 2, margin + headerH, pageH - margin - footerH);
+      }
       const pc = pos % colsPerPage;
       const pr = Math.floor(pos / colsPerPage);
-      const c = renderBoardToCanvas(result, bx, by, boardPx, { boardNo: k, total });
+      const c = renderBoardToCanvas(result, bx, by, boardPx, { boardNo: placed + 1, total });
       const wCells = Math.min(bw, cols - bx * bw);
       const hCells = Math.min(bh, rows - by * bh);
       const imgW = wCells * cellMm;
       const imgH = hCells * cellMm;
       const cellW = availW / colsPerPage;
       const cellH = availH / rowsPerPage;
-      const x = margin + pc * cellW + (cellW - imgW) / 2;
-      const y = margin + pr * cellH + (cellH - imgH) / 2 + 6;
+      const x = margin + rulerW + pc * cellW + (cellW - imgW) / 2;
+      const y = margin + headerH + pr * cellH + (cellH - imgH) / 2;
       pdf.addImage(c.toDataURL("image/png"), "PNG", x, y, imgW, imgH);
+      if (wCells === bw && hCells === bh) {
+        pdf.setDrawColor(120);
+        pdf.setLineWidth(0.4);
+        pdf.setLineDashPattern([2, 1], 0);
+        pdf.rect(x, y, imgW, imgH);
+        pdf.setLineDashPattern([], 0);
+      }
       placed++;
     }
   }
   pdf.addPage();
+  pageNum++;
+  drawHeader(pageNum);
+  drawFooter(pageNum);
   renderLegendPage(pdf, result);
   pdf.save("pindou-blocks-A4.pdf");
 }
@@ -2003,8 +2524,14 @@ function exportPack() {
 }
 
 function openPaywall(reason) {
-  $("#paywallReason").textContent = reason || "";
-  $("#paywall").classList.add("show");
+  const el = $("#paywall");
+  const r = $("#paywallReason");
+  if (r) r.textContent = reason || "";
+  if (el) {
+    el.classList.add("show");
+    el.style.display = "flex";
+    el.style.zIndex = "2147483647";
+  }
 }
 
 function applyView() {
@@ -2118,15 +2645,27 @@ function applyIcons() {
 
 function applyTheme(name) {
   document.body.setAttribute("data-theme", name);
-  try {
-    localStorage.setItem("pindou-theme", name);
-  } catch (e) {}
+  try { localStorage.setItem("pindou-theme", name); } catch (e) {}
   document.querySelectorAll(".theme-pick .seg").forEach((b) => {
     b.classList.toggle("active", b.dataset.theme === name);
   });
+  const themeColors = { pixel: "#2b6cff", cute: "#ff6f9c", fries: "#DA291C" };
+  const bgColors = { pixel: "#eef2f8", cute: "#fff4f7", fries: "#FFF8E7" };
+  const tc = themeColors[name] || "#2b6cff";
+  const bc = bgColors[name] || "#eef2f8";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", tc);
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: "update-manifest", theme_color: tc, background_color: bc });
+  }
 }
 
 function init() {
+  if (new URLSearchParams(location.search).get("reset") === "1") {
+    try { localStorage.clear(); } catch(e) {}
+    location.replace(location.pathname);
+    return;
+  }
   const saved = (() => {
     try {
       return localStorage.getItem("pindou-theme");
@@ -2135,6 +2674,16 @@ function init() {
     }
   })();
   applyTheme(saved || "pixel");
+
+  document.querySelectorAll(".lang-pick .seg").forEach((b) => {
+    b.classList.toggle("active", b.dataset.lang === I18N.getLang());
+    b.addEventListener("click", () => {
+      I18N.setLang(b.dataset.lang);
+      document.querySelectorAll(".lang-pick .seg").forEach((s) => s.classList.toggle("active", s.dataset.lang === b.dataset.lang));
+  I18N.applyTranslations();
+    });
+  });
+  I18N.applyTranslations();
 
   const pal = $("#palette");
   for (const key of Object.keys(BEAD_PALETTES)) {
@@ -2223,6 +2772,12 @@ function init() {
       document.querySelector(".controls")?.classList.toggle("collapsed");
     });
   }
+  const advToggle = document.querySelector(".adv-toggle");
+  if (advToggle) {
+    advToggle.addEventListener("click", () => {
+      document.querySelector(".controls-advanced")?.classList.toggle("collapsed");
+    });
+  }
   const detailsToggle = document.querySelector(".details-toggle");
   if (detailsToggle) {
     detailsToggle.addEventListener("click", () => {
@@ -2279,6 +2834,11 @@ function init() {
       if (f && f.type && f.type.startsWith("image/")) loadImage(f);
     });
   }
+  let dragCounter = 0;
+  document.addEventListener("dragenter", (e) => { e.preventDefault(); dragCounter++; document.body.classList.add("drag-active"); });
+  document.addEventListener("dragleave", (e) => { e.preventDefault(); dragCounter--; if (dragCounter <= 0) { dragCounter = 0; document.body.classList.remove("drag-active"); } });
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", (e) => { e.preventDefault(); dragCounter = 0; document.body.classList.remove("drag-active"); });
   window.addEventListener("paste", (e) => {
     const items = e.clipboardData && e.clipboardData.items;
     if (!items) return;
@@ -2293,6 +2853,16 @@ function init() {
   $("#sampleBtn").addEventListener("click", loadSample);
   $("#newBtn").addEventListener("click", clearProject);
   $("#runBtn").addEventListener("click", run);
+  const batchInput = $("#batchFile");
+  if (batchInput) batchInput.addEventListener("change", (e) => { if (e.target.files.length) startBatch(e.target.files); e.target.value = ""; });
+  const shareBtn = $("#shareBtn");
+  if (shareBtn) shareBtn.addEventListener("click", generateShareLink);
+  const wmText = $("#watermarkText");
+  if (wmText) wmText.addEventListener("input", (e) => { state.watermarkText = e.target.value || "拼豆图稿平台"; });
+  const wmOpacity = $("#watermarkOpacity");
+  if (wmOpacity) wmOpacity.addEventListener("input", (e) => { state.watermarkOpacity = e.target.value / 100; const v = $("#wmOpacityVal"); if (v) v.textContent = e.target.value + "%"; });
+  const wmAngle = $("#watermarkAngle");
+  if (wmAngle) wmAngle.addEventListener("input", (e) => { state.watermarkAngle = Number(e.target.value); const v = $("#wmAngleVal"); if (v) v.textContent = e.target.value + "°"; });
 
   $("#exportPreview").addEventListener("click", exportPreview);
   $("#exportPixel").addEventListener("click", exportPixelPng);
@@ -2300,6 +2870,7 @@ function init() {
   $("#exportSvg").addEventListener("click", exportSvg);
   $("#exportPdf").addEventListener("click", exportPdf);
   $("#exportPack").addEventListener("click", exportPack);
+  $("#upgradePro").addEventListener("click", () => openPaywall("升级 Pro 解锁：去水印完整图、矢量 SVG、A4 分块打印 PDF、分板裁切图"));
 
   $("#zoomFit").addEventListener("click", () => setZoom("fit"));
   $("#zoomIn").addEventListener("click", () => {
@@ -2403,16 +2974,27 @@ function init() {
 
   $("#unlockPro").addEventListener("click", () => {
     state.pro = true;
-    $("#paywall").classList.remove("show");
+    const pw = $("#paywall");
+    if (pw) { pw.classList.remove("show"); pw.style.display = ""; pw.style.zIndex = ""; }
     if (state.result) run();
   });
   $("#paywallClose").addEventListener("click", () => {
-    $("#paywall").classList.remove("show");
+    const pw = $("#paywall");
+    if (pw) { pw.classList.remove("show"); pw.style.display = ""; pw.style.zIndex = ""; }
+  });
+  $("#paywall").addEventListener("click", (e) => {
+    if (e.target === $("#paywall")) {
+      $("#paywall").classList.remove("show");
+      $("#paywall").style.display = "";
+      $("#paywall").style.zIndex = "";
+    }
   });
 
   // 图纸库
   const openLibBtn = $("#openLibrary");
   if (openLibBtn) openLibBtn.addEventListener("click", openLibrary);
+  const openHistBtn = $("#openHistory");
+  if (openHistBtn) openHistBtn.addEventListener("click", History.show);
   const saveDrawBtn = $("#saveDrawingBtn");
   if (saveDrawBtn)
     saveDrawBtn.addEventListener("click", () => {
@@ -2467,24 +3049,36 @@ function init() {
     b.addEventListener("click", () => applyTheme(b.dataset.theme));
   });
 
+  const darkBtn = $("#darkModeBtn");
+  if (darkBtn) {
+    const dmSaved = (() => { try { return localStorage.getItem("pindou-dark") === "1"; } catch(e) { return false; } })();
+    if (dmSaved) { document.body.classList.add("dark-mode"); darkBtn.textContent = "☀️"; }
+    darkBtn.addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+      const isDark = document.body.classList.contains("dark-mode");
+      darkBtn.textContent = isDark ? "☀️" : "🌙";
+      try { localStorage.setItem("pindou-dark", isDark ? "1" : "0"); } catch(e) {}
+      const themeColors = { pixel: "#2b6cff", cute: "#ff6f9c", fries: "#DA291C" };
+      const currentTheme = document.body.getAttribute("data-theme") || "pixel";
+      const tc = isDark ? "#1a1a2e" : (themeColors[currentTheme] || "#2b6cff");
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", tc);
+      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: "update-manifest", theme_color: tc, background_color: isDark ? "#0f0f1e" : "#eef2f8" });
+      }
+    });
+  }
+
   window.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
     if (!state.editing) return;
-    const map = {
-      b: "paint",
-      e: "erase",
-      i: "pick",
-      g: "fill",
-      l: "line",
-      r: "rect",
-      o: "ellipse",
-      s: "select",
-      t: "text",
-      v: "view",
-    };
-    const tool = map[e.key.toLowerCase()];
+    const toolMap = {};
+    for (const [tool, key] of Object.entries(Shortcuts.getAllBindings())) {
+      toolMap[key] = tool;
+    }
+    const tool = toolMap[e.key.toLowerCase()];
     if (tool) {
       setTool(tool);
       e.preventDefault();
@@ -2497,12 +3091,58 @@ function init() {
     }
   });
 
-  if (!restoreProject()) loadSample();
+  window.addEventListener("keydown", (e) => {
+    if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable)) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      if (state.editing) return;
+      if (e.shiftKey) mainRedo(); else mainUndo();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+      e.preventDefault();
+      if (!state.editing) mainRedo();
+    }
+  });
+
+  if (!tryLoadShare() && !restoreProject()) loadSample();
 
   const ah = document.querySelector(".actions-hint");
   if (!window.jspdf || !window.jspdf.jsPDF) {
     if (ah) ah.insertAdjacentHTML("afterbegin", "⚠ PDF 库未加载，PDF 导出暂不可用（联网后刷新即可）。");
   }
+
+  const helpBtn = $("#helpBtn");
+  if (helpBtn) {
+    const showHelp = (e) => {
+      if (e) e.preventDefault();
+      try { Tutorial.forceShow(); } catch(err) { alert("使用说明：\n1. 上传图片\n2. 调整参数\n3. 生成图稿\n4. 导出/保存"); }
+    };
+    helpBtn.addEventListener("click", showHelp);
+    helpBtn.addEventListener("touchend", showHelp);
+  }
+  try { Tutorial.init(); } catch(e) {}
+
+  window._pState = state;
+  window._pApplyDrawing = applyDrawingData;
+  ErrorBoundary.install();
+  IpadFixes.init();
+
+  const jpgBtn = $("#exportJpg");
+  if (jpgBtn) jpgBtn.addEventListener("click", () => Features.exportAsFormat("jpg"));
+  const bmpBtn = $("#exportBmp");
+  if (bmpBtn) bmpBtn.addEventListener("click", () => Features.exportAsFormat("bmp"));
+  const compareBtn = $("#compareBtn");
+  if (compareBtn) compareBtn.addEventListener("click", () => Features.showComparison());
+  const snapBtn = $("#snapshotBtn");
+  if (snapBtn) snapBtn.addEventListener("click", takeSnapshot);
+  const compSnapBtn = $("#compareSnapshotBtn");
+  if (compSnapBtn) compSnapBtn.addEventListener("click", compareWithSnapshot);
+  const calcBtn = $("#calcBtn");
+  if (calcBtn) calcBtn.addEventListener("click", () => Features.showCalculator());
+  const scBtn = $("#shortcutsBtn");
+  if (scBtn) scBtn.addEventListener("click", () => Shortcuts.show());
+  const verBtn = $("#versionsBtn");
+  if (verBtn) verBtn.addEventListener("click", () => Versions.showVersions());
 }
 
 function insertPrompt(text) {
@@ -2859,12 +3499,108 @@ function applyToolAt(r, c) {
     setTool("paint");
     return;
   }
+  if (state.editTool === "replace") {
+    const col = effectiveColor(cell, state.result);
+    if (col) showReplacePopup(col.code, col.hex);
+    return;
+  }
   if (state.editTool === "fill") {
     floodFill(r, c);
     return;
   }
   if (state.editTool === "paint" || state.editTool === "erase") {
     paintStrokeCell(r, c, state.editTool === "erase");
+  }
+}
+
+function showReplacePopup(srcCode, srcHex) {
+  const old = document.getElementById("replacePopup");
+  if (old) old.remove();
+  const pal = editFullPalette.filter(c => !c.isBg);
+  const srcCol = pal.find(c => c.code === srcCode);
+  const srcLab = srcCol ? rgbToLab(srcCol.r, srcCol.g, srcCol.b) : null;
+  let suggestions = [];
+  if (srcLab) {
+    suggestions = pal
+      .filter(c => c.code !== srcCode)
+      .map(c => ({ ...c, dist: sqDist(srcLab, rgbToLab(c.r, c.g, c.b)) }))
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, 5);
+  }
+  const overlay = document.createElement("div");
+  overlay.id = "replacePopup";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:2147483647;display:flex;align-items:center;justify-content:center";
+  const box = document.createElement("div");
+  box.style.cssText = "background:var(--panel);border:3px solid var(--border-strong);border-radius:8px;padding:20px;max-width:420px;width:90vw;box-shadow:var(--shadow);max-height:80vh;overflow-y:auto";
+  let html = `<div style="font-weight:700;margin-bottom:12px">全局换色</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px">
+      <span style="display:inline-block;width:18px;height:18px;border-radius:4px;border:2px solid var(--border-strong);background:${srcHex}"></span>
+      <b>${srcCode}</b> → 选择目标颜色
+    </div>`;
+  if (suggestions.length) {
+    html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px">最接近的颜色（点击替换）：</div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">`;
+    for (const s of suggestions) {
+      html += `<button data-code="${s.code}" style="display:flex;align-items:center;gap:4px;padding:4px 8px;border:2px solid var(--border);border-radius:4px;background:var(--panel-2);cursor:pointer;font-size:11px;color:var(--text)">
+        <span style="width:14px;height:14px;border-radius:3px;border:1px solid var(--border-strong);background:${s.hex};flex-shrink:0"></span>
+        ${s.code}
+      </button>`;
+    }
+    html += `</div>`;
+  }
+  html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px">全部颜色：</div>
+    <div id="replaceGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(36px,1fr));gap:4px;max-height:200px;overflow-y:auto;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="replaceCancel" style="padding:6px 16px;border:2px solid var(--border-strong);border-radius:var(--btn-radius);background:var(--panel-2);color:var(--text);cursor:pointer;font-weight:600">取消</button>
+    </div>`;
+  box.innerHTML = html;
+  box.querySelectorAll("[data-code]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      replaceAllColors(srcCode, btn.dataset.code);
+      overlay.remove();
+    });
+  });
+  const grid = box.querySelector("#replaceGrid");
+  for (const c of pal) {
+    const btn = document.createElement("button");
+    btn.style.cssText = "width:36px;height:36px;border:2px solid var(--border);border-radius:4px;background:" + c.hex + ";cursor:pointer;position:relative";
+    btn.title = c.code;
+    btn.onclick = () => {
+      replaceAllColors(srcCode, c.code);
+      overlay.remove();
+    };
+    grid.appendChild(btn);
+  }
+  box.querySelector("#replaceCancel").onclick = () => overlay.remove();
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+function replaceAllColors(srcCode, dstCode) {
+  if (!state.result) return;
+  const dstCol = editFullPalette.find(c => c.code === dstCode);
+  if (!dstCol) return;
+  pushUndo();
+  let count = 0;
+  for (let r = 0; r < state.result.rows; r++) {
+    for (let c = 0; c < state.result.cols; c++) {
+      const cell = state.result.grid[r][c];
+      const ec = effectiveColor(cell, state.result);
+      if (ec && ec.code === srcCode) {
+        cell.code = dstCode;
+        cell.hex = dstCol.hex;
+        cell.r = dstCol.r;
+        cell.g = dstCol.g;
+        cell.b = dstCol.b;
+        cell.bg = false;
+        count++;
+      }
+    }
+  }
+  if (count > 0) {
+    redraw();
+    setHint(`已替换 ${count} 颗 ${srcCode} → ${dstCode}`);
   }
 }
 
@@ -3332,11 +4068,11 @@ function initEditListeners() {
       redraw();
       return;
     }
-    const map = {
-      b: "paint", e: "erase", i: "pick", g: "fill", v: "view",
-      l: "line", r: "rect", o: "ellipse", s: "select", t: "text",
-    };
-    if (map[e.key.toLowerCase()]) setTool(map[e.key.toLowerCase()]);
+    const toolMap = {};
+    for (const [tool, key] of Object.entries(Shortcuts.getAllBindings())) {
+      toolMap[key] = tool;
+    }
+    if (toolMap[e.key.toLowerCase()]) setTool(toolMap[e.key.toLowerCase()]);
   });
 }
 
